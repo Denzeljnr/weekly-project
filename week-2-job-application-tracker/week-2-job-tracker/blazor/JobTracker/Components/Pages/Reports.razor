@@ -1,0 +1,186 @@
+﻿@page "/reports"
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using JobTracker.Data
+@inject AppDbContext Db
+
+<h1 class="page-title">Reports</h1>
+<p class="page-sub">How your search has moved, week by week and month by month.</p>
+
+<a class="export-btn" href="/export/excel">Export outcomes to Excel</a>
+
+<h2 class="section-title">Last 8 weeks</h2>
+<div class="board">
+    <div class="report-header">
+        <span>Week of</span><span>Total</span><span>Applied</span><span>Interview</span><span>Offer</span><span>Rejected</span>
+    </div>
+    @foreach (var w in weekly)
+    {
+        <div class="report-row">
+            <span class="mono">@w.Label</span>
+            <span class="mono">@w.Total</span>
+            <span class="mono">@w.Applied</span>
+            <span class="mono">@w.Interview</span>
+            <span class="mono">@w.Offer</span>
+            <span class="mono">@w.Rejected</span>
+        </div>
+    }
+</div>
+
+<h2 class="section-title">Last 6 months</h2>
+<div class="board">
+    <div class="report-header">
+        <span>Month</span><span>Total</span><span>Applied</span><span>Interview</span><span>Offer</span><span>Rejected</span>
+    </div>
+    @foreach (var m in monthly)
+    {
+        <div class="report-row">
+            <span class="mono">@m.Label</span>
+            <span class="mono">@m.Total</span>
+            <span class="mono">@m.Applied</span>
+            <span class="mono">@m.Interview</span>
+            <span class="mono">@m.Offer</span>
+            <span class="mono">@m.Rejected</span>
+        </div>
+    }
+</div>
+
+<style>
+    .page-title {
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+        font-size: 2rem;
+        margin: 0 0 4px;
+    }
+
+    .page-sub {
+        color: #9BA5A9;
+        margin: 0 0 20px;
+        font-size: 0.95rem;
+    }
+
+    .section-title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin: 32px 0 12px;
+    }
+
+    .export-btn {
+        display: inline-block;
+        background: #E8A33D;
+        color: #12181B;
+        padding: 9px 18px;
+        border-radius: 6px;
+        font-weight: 600;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .board {
+        background: #1B2328;
+        border: 1px solid #232C31;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .report-header, .report-row {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr 1fr 1fr 1fr 1fr;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 20px;
+    }
+
+    .report-header {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6B7579;
+        border-bottom: 1px solid #232C31;
+    }
+
+    .report-row {
+        border-bottom: 1px solid #202A2E;
+        font-size: 0.9rem;
+    }
+
+        .report-row:last-child {
+            border-bottom: none;
+        }
+
+    .mono {
+        font-family: 'IBM Plex Mono', monospace;
+    }
+</style>
+
+@code {
+    private record PeriodStat(string Label, int Total, int Applied, int Interview, int Offer, int Rejected);
+
+    private List<PeriodStat> weekly = new();
+    private List<PeriodStat> monthly = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var apps = await Db.Applications.ToListAsync();
+
+        var earliestApplied = apps.Any()
+            ? apps.Min(a => a.DateApplied.ToDateTime(TimeOnly.MinValue))
+            : DateTime.Today;
+
+        // --- Weekly ---
+        var currentWeekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        var earliestWeekStart = earliestApplied.AddDays(-(int)earliestApplied.DayOfWeek);
+        var weeksSinceStart = (int)((currentWeekStart - earliestWeekStart).TotalDays / 7) + 1;
+        var weeksToShow = Math.Min(8, weeksSinceStart);
+
+        weekly = Enumerable.Range(0, weeksToShow)
+            .Select(i => currentWeekStart.AddDays(-7 * i))
+            .Select(weekStart =>
+            {
+                var inWeek = apps.Where(a =>
+                {
+                    var applied = a.DateApplied.ToDateTime(TimeOnly.MinValue);
+                    return applied >= weekStart && applied < weekStart.AddDays(7);
+                }).ToList();
+
+                return new PeriodStat(
+                    weekStart.ToString("MMM d"),
+                    inWeek.Count, // total sent that week, regardless of current status
+                    inWeek.Count(a => a.Status == "applied"),
+                    inWeek.Count(a => a.Status == "interview"),
+                    inWeek.Count(a => a.Status == "offer"),
+                    inWeek.Count(a => a.Status == "rejected"));
+            })
+            .Reverse()
+            .ToList();
+
+        // --- Monthly ---
+        var currentMonthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var earliestMonthStart = new DateTime(earliestApplied.Year, earliestApplied.Month, 1);
+        var monthsSinceStart = ((currentMonthStart.Year - earliestMonthStart.Year) * 12
+            + currentMonthStart.Month - earliestMonthStart.Month) + 1;
+        var monthsToShow = Math.Min(6, monthsSinceStart);
+
+        monthly = Enumerable.Range(0, monthsToShow)
+            .Select(i => currentMonthStart.AddMonths(-i))
+            .Select(monthStart =>
+            {
+                var inMonth = apps.Where(a =>
+                {
+                    var applied = a.DateApplied.ToDateTime(TimeOnly.MinValue);
+                    return applied.Year == monthStart.Year && applied.Month == monthStart.Month;
+                }).ToList();
+
+                return new PeriodStat(
+                    monthStart.ToString("MMM yyyy"),
+                    inMonth.Count,
+                    inMonth.Count(a => a.Status == "applied"),
+                    inMonth.Count(a => a.Status == "interview"),
+                    inMonth.Count(a => a.Status == "offer"),
+                    inMonth.Count(a => a.Status == "rejected"));
+            })
+            .Reverse()
+            .ToList();
+    }
+}
