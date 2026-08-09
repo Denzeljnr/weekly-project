@@ -1,0 +1,56 @@
+﻿<div class="nav-brand">
+    <span class="nav-brand-mark"></span>
+    JobTracker
+</div>
+
+<nav class="nav-list">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Applications</NavLink>
+    <NavLink class="nav-link" href="reports">Reports</NavLink>
+</nav>
+
+<style>
+    .nav-brand {
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+        font-size: 1.15rem;
+        color: #EDEAE2;
+        padding: 24px 20px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .nav-brand-mark {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #6FA287;
+        box-shadow: 0 0 8px #6FA287;
+        flex-shrink: 0;
+    }
+
+    .nav-list {
+        padding: 0 12px;
+    }
+
+    .nav-link {
+        display: block;
+        padding: 10px 12px;
+        border-radius: 6px;
+        color: #9BA5A9;
+        text-decoration: none;
+        font-size: 0.92rem;
+        font-weight: 500;
+        transition: background 0.15s, color 0.15s;
+    }
+
+        .nav-link:hover {
+            background: #1B2328;
+            color: #EDEAE2;
+        }
+
+        .nav-link.active {
+            background: #1B2328;
+            color: #E8A33D;
+        }
+</style>
