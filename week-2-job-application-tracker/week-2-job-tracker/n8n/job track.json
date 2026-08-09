@@ -1,0 +1,804 @@
+{
+  "name": "job track",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        928
+      ],
+      "id": "603f451d-9caa-4600-8ded-125d8e9f42a3",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "pwbrojGj0aRtBzLK",
+          "name": "second main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clearDeduplicationHistory",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        240,
+        912
+      ],
+      "id": "fd09e78f-217c-4f18-9064-f0f7a8cd00be",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Email subject: {{ $json.Subject }}\nEmail from: {{ $json.From }}\nEmail body: {{ $json.text || $json.snippet }}",
+        "options": {
+          "systemMessage": "=You are classifying inbound emails for a job application tracker.\n\nGiven an email's subject, sender, and body, determine:\n1. Is this related to a job application? (yes/no)\n2. What's the company name? Extract it cleanly (e.g. \"Google\", not \"Google LLC Careers Team\").\n3. What's the job title/role, if mentioned? Null if not mentioned.\n4. Classify status as exactly one of:\n   - application_confirmation (first automated \"thanks for applying\" email, confirming a NEW application)\n   - interview (an interview is being requested or scheduled)\n   - offer (a job offer is being extended, or acceptance of the candidate is confirmed)\n   - rejected (the application was declined)\n   - no_response_but_active (a follow-up about an existing application, no new outcome)\n   - unclear (job-related but doesn't fit confidently into any of the above)\n5. If status is \"rejected\" or \"offer\", write one plain-language sentence summarizing the email's key point (reason given, next steps, salary/start date if an offer). Otherwise null.\n\nRespond ONLY in this exact JSON format, no other text:\n{\n  \"job_related\": true or false,\n  \"company\": \"string or null\",\n  \"role\": \"string or null\",\n  \"status\": \"string or null\",\n  \"summary\": \"string or null\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        416,
+        912
+      ],
+      "id": "9a9cedca-72e9-48d3-a932-7f06bc9136f3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        432,
+        1104
+      ],
+      "id": "e1fe61f1-a792-47f7-bd8c-2e1c2350a8b5",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2527dcf8-f8c3-4db1-af14-8cbf87da6b77",
+              "leftValue": "={{ $json.job_related }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        912
+      ],
+      "id": "1f0d8906-733a-43ae-9388-b4f7f145d44f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nlet parsed;\ntry {\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { job_related: false }; // fail safe — same principle as the Blazor version\n}\nreturn [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        912
+      ],
+      "id": "c0c8ffca-4a60-48f8-8567-0aab8873ce90",
+      "name": "parse the Agent response"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -240,
+        1344
+      ],
+      "id": "72ca6d4b-f9c0-457a-b3e5-aa0892255266",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4c9e82a6-cf0e-4f52-a8e1-da0db82e0f62",
+              "leftValue": "={{ $json.Subject }}",
+              "rightValue": "[JobTracker Report]",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        928
+      ],
+      "id": "ada22195-55c3-4835-8683-55e093125aab",
+      "name": "Skip Own Reports"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc",
+          "mode": "list",
+          "cachedResultName": "job tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        816
+      ],
+      "id": "4719690d-9be7-405b-b6e0-d250f377ecde",
+      "name": "Read Applications Sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "uFsmt0j8avQG6nJZ",
+          "name": "main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const agent = $('parse the Agent response').first().json;;\nconst existingRows = $input.all()\n  .map(item => item.json)\n  .filter(row => row.company); // drops the empty placeholder item when the sheet has no real rows yet\n\nconst statusMap = {\n  application_confirmation: 'applied',\n  interview: 'interview',\n  offer: 'offer',\n  rejected: 'rejected',\n  no_response_but_active: 'applied',\n  unclear: null\n};\nconst newStatus = statusMap[agent.status];\n\nif (!newStatus || !agent.company) {\n  return [{ json: { skip: true } }];\n}\n\n// Fuzzy match, case-insensitive partial — mirrors the Blazor ILIKE behavior\nconst companyLower = agent.company.toLowerCase();\nconst match = existingRows.find(r =>\n  r.company.toLowerCase().includes(companyLower) ||\n  companyLower.includes(r.company.toLowerCase())\n);\n\n// Once an application has a final outcome, don't let any further\n// classification (correct or mistaken) move it backward — mirrors the Blazor fix.\nif (match && (match.status === 'offer' || match.status === 'rejected')) {\n  return [{ json: { skip: true } }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    company: match ? match.company : agent.company,\n    role: match ? (match.role || agent.role || '') : (agent.role || ''),\n    date_applied: match ? match.date_applied : new Date().toISOString().split('T')[0],\n    status: newStatus,\n    last_updated: new Date().toISOString().split('T')[0],\n    summary: (newStatus === 'rejected' || newStatus === 'offer')\n      ? agent.summary\n      : (match ? match.summary : '')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        800
+      ],
+      "id": "21a3d310-3812-496a-a0c0-52bf7d825d88",
+      "name": "Decide Status & Match Company"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "17c3d17d-bcf5-4835-b3fb-9b209584409b",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        800
+      ],
+      "id": "f9359e8b-5260-4dbf-83d0-ffa36ca1b887",
+      "name": "Skip If Nothing To Do"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc",
+          "mode": "list",
+          "cachedResultName": "job tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{ $json.company }}",
+            "role": "={{ $('Decide Status & Match Company').item.json.role }}",
+            "date_applied": "={{ $('Decide Status & Match Company').item.json.date_applied }}",
+            "status": "={{ $('Decide Status & Match Company').item.json.status }}",
+            "last_updated": "={{ $('Decide Status & Match Company').item.json.last_updated }}",
+            "summary": "={{ $('Decide Status & Match Company').item.json.summary }}"
+          },
+          "matchingColumns": [
+            "company"
+          ],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_applied",
+              "displayName": "date_applied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_updated",
+              "displayName": "last_updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1824,
+        704
+      ],
+      "id": "cedf17a6-c034-4e86-8033-9f2611875b95",
+      "name": "Save to Applications Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "uFsmt0j8avQG6nJZ",
+          "name": "main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc",
+          "mode": "list",
+          "cachedResultName": "job tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18I7gzD6QJdM3YTCPUqLCg5X3tlS10Og822Oj_sikYPc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -32,
+        1344
+      ],
+      "id": "8d45cb0f-5649-4655-9842-5232340a2d8c",
+      "name": "Read All Applications",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "uFsmt0j8avQG6nJZ",
+          "name": "main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json);\n\nfunction bucketBy(rows, keyFn) {\n  const buckets = {};\n  for (const r of rows) {\n    const key = keyFn(new Date(r.date_applied));\n    buckets[key] ??= { applied: 0, interview: 0, offer: 0, rejected: 0 };\n    if (buckets[key][r.status] !== undefined) buckets[key][r.status]++;\n  }\n  return buckets;\n}\n\nconst weekly = bucketBy(rows, d => {\n  const weekStart = new Date(d);\n  weekStart.setDate(d.getDate() - d.getDay());\n  return weekStart.toISOString().split('T')[0];\n});\n\nconst monthly = bucketBy(rows, d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);\n\nreturn [{ json: { weekly, monthly } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1344
+      ],
+      "id": "7c23bdc4-1309-43aa-9a2f-0188211ba3e2",
+      "name": "Build Weekly/Monthly Stats"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { weekly, monthly } = $input.first().json;\n\nfunction formatSection(title, buckets) {\n  let rows = '';\n  for (const [period, counts] of Object.entries(buckets)) {\n    rows += `\n      <tr>\n        <td style=\"padding:6px 12px;\">${period}</td>\n        <td style=\"padding:6px 12px;\">${counts.applied}</td>\n        <td style=\"padding:6px 12px;\">${counts.interview}</td>\n        <td style=\"padding:6px 12px;\">${counts.offer}</td>\n        <td style=\"padding:6px 12px;\">${counts.rejected}</td>\n      </tr>`;\n  }\n  return `\n    <h3 style=\"margin-bottom:6px;\">${title}</h3>\n    <table style=\"border-collapse:collapse; font-family:sans-serif; font-size:14px;\">\n      <tr style=\"text-align:left; color:#555;\">\n        <th style=\"padding:6px 12px;\">Period</th>\n        <th style=\"padding:6px 12px;\">Applied</th>\n        <th style=\"padding:6px 12px;\">Interview</th>\n        <th style=\"padding:6px 12px;\">Offer</th>\n        <th style=\"padding:6px 12px;\">Rejected</th>\n      </tr>\n      ${rows}\n    </table>`;\n}\n\nconst emailBody = `\n  <div style=\"font-family:sans-serif;\">\n    ${formatSection('This week (last 8 weeks)', weekly)}\n    <br>\n    ${formatSection('By month (last 6 months)', monthly)}\n  </div>\n`;\n\nreturn [{ json: { emailBody } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        1344
+      ],
+      "id": "34c22de5-ad9d-4721-8b99-57c97bf7c540",
+      "name": "Format Report HTML"
+    },
+    {
+      "parameters": {
+        "sendTo": "email",
+        "subject": "=[JobTracker Report] Weekly summary — {{ $now.format('MMM d') }}",
+        "message": "={{ $json.emailBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        1344
+      ],
+      "id": "562b1e8a-17e1-4d5b-8100-e5ce53f89307",
+      "name": "Email Report to Self",
+      "webhookId": "efeeadf6-b17b-4f03-accd-7db148aca01a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "pwbrojGj0aRtBzLK",
+          "name": "second main"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Gmail Trigger": [
+      {
+        "json": {
+          "id": "19fd885de61551a8",
+          "threadId": "19fd85fbe9382383",
+          "snippet": "Hi we are excited to let you know that blue perk analytics would like to offer you the data analyst position. Starting salary will be $72000 per year Propose starting date September 1st 2026 Please let",
+          "payload": {
+            "mimeType": "multipart/alternative"
+          },
+          "sizeEstimate": 10443,
+          "historyId": "1936634",
+          "internalDate": "1786044068000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "IMPORTANT",
+              "name": "IMPORTANT"
+            },
+            {
+              "id": "CATEGORY_PERSONAL",
+              "name": "CATEGORY_PERSONAL"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "From": "Johnpaul Nwokocha <denzeljnr428@gmail.com>",
+          "Subject": "Re: Thanks for applying to blueperk analytics",
+          "To": "Johnpaul Nwokocha <chukwudubemnwokocha@gmail.com>"
+        }
+      }
+    ],
+    "Remove Duplicates": [
+      {
+        "json": {
+          "id": "19fd885de61551a8",
+          "threadId": "19fd85fbe9382383",
+          "snippet": "Hi we are excited to let you know that blue perk analytics would like to offer you the data analyst position. Starting salary will be $72000 per year Propose starting date September 1st 2026 Please let",
+          "payload": {
+            "mimeType": "multipart/alternative"
+          },
+          "sizeEstimate": 10443,
+          "historyId": "1936634",
+          "internalDate": "1786044068000",
+          "labels": [
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "IMPORTANT",
+              "name": "IMPORTANT"
+            },
+            {
+              "id": "CATEGORY_PERSONAL",
+              "name": "CATEGORY_PERSONAL"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "From": "Johnpaul Nwokocha <denzeljnr428@gmail.com>",
+          "Subject": "Re: Thanks for applying to blueperk analytics",
+          "To": "Johnpaul Nwokocha <chukwudubemnwokocha@gmail.com>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "AI Agent": [
+      {
+        "json": {
+          "output": "```json\n{\n  \"job_related\": true,\n  \"company\": \"blueperk analytics\",\n  \"role\": \"Data Analyst\",\n  \"status\": \"offer\",\n  \"summary\": \"Blueperk Analytics is offering the Data Analyst position with a starting salary of $72,000 per year and a proposed start date of September 1, 2026.\"\n}\n```"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "parse the Agent response": [
+      {
+        "json": {
+          "job_related": true,
+          "company": "blueperk analytics",
+          "role": "Data Analyst",
+          "status": "offer",
+          "summary": "Blueperk Analytics is offering the Data Analyst position with a starting salary of $72,000 per year and a proposed start date of September 1, 2026."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-08-06T15:37:04.828-04:00",
+          "Readable date": "August 6th 2026, 3:37:04 pm",
+          "Readable time": "3:37:04 pm",
+          "Day of week": "Thursday",
+          "Year": "2026",
+          "Month": "August",
+          "Day of month": "06",
+          "Hour": "15",
+          "Minute": "37",
+          "Second": "04",
+          "Timezone": "America/New_York (UTC-04:00)"
+        }
+      }
+    ],
+    "Read Applications Sheet": [
+      {
+        "json": {
+          "row_number": 2,
+          "company": "Blueperk Analytics",
+          "role": "data analyst",
+          "date_applied": "2026-08-06",
+          "status": "applied",
+          "last_updated": "2026-08-06",
+          "summary": ""
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Decide Status & Match Company": [
+      {
+        "json": {
+          "skip": false,
+          "company": "Blueperk Analytics",
+          "role": "data analyst",
+          "date_applied": "2026-08-06",
+          "status": "offer",
+          "last_updated": "2026-08-09",
+          "summary": "Blueperk Analytics is offering the Data Analyst position with a starting salary of $72,000 per year and a proposed start date of September 1, 2026."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Read All Applications": [
+      {
+        "json": {
+          "row_number": 2,
+          "company": "Blueperk Analytics",
+          "role": "data analyst",
+          "date_applied": "2026-08-06",
+          "status": "offer",
+          "last_updated": "2026-08-06",
+          "summary": "Blueperk Analytics is offering the Data Analyst position with a starting salary of $72,000 per year and a proposed start date of September 1, 2026."
+        }
+      }
+    ],
+    "Build Weekly/Monthly Stats": [
+      {
+        "json": {
+          "weekly": {
+            "2026-08-02": {
+              "applied": 0,
+              "interview": 0,
+              "offer": 1,
+              "rejected": 0
+            }
+          },
+          "monthly": {
+            "2026-08": {
+              "applied": 0,
+              "interview": 0,
+              "offer": 1,
+              "rejected": 0
+            }
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Skip Own Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "parse the Agent response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Read Applications Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse the Agent response": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read All Applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Own Reports": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Applications Sheet": {
+      "main": [
+        [
+          {
+            "node": "Decide Status & Match Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Status & Match Company": {
+      "main": [
+        [
+          {
+            "node": "Skip If Nothing To Do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip If Nothing To Do": {
+      "main": [
+        [
+          {
+            "node": "Save to Applications Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Applications": {
+      "main": [
+        [
+          {
+            "node": "Build Weekly/Monthly Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Weekly/Monthly Stats": {
+      "main": [
+        [
+          {
+            "node": "Format Report HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report HTML": {
+      "main": [
+        [
+          {
+            "node": "Email Report to Self",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "9cf1a0a8-d3ab-445a-b8ec-a51ac2753808",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "64da9526fde6bb3f90690ef6b939b0ac43bb69a86da72fc052a72243617aee08"
+  },
+  "id": "VBjQzt4rIx77fUCJfYh48",
+  "tags": []
+}
