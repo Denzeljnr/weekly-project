@@ -1,9 +1,0 @@
-services:
-  tracker:
-    build: .
-    ports:
-      - "3000:3000"
-    env_file: .env
-    volumes:
-      - ./data.json:/app/data.json
-      - ./uploads:/app/uploads
