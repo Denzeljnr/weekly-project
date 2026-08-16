@@ -1,0 +1,89 @@
+﻿@page "/"
+@using Microsoft.EntityFrameworkCore
+@using IncidentAgent.Data
+@inject AppDbContext Db
+
+<h1 class="page-title">Active Incidents</h1>
+<p class="page-sub">Real-time AI diagnostic assessment across all services.</p>
+
+<div class="board">
+    <div class="board-header">
+        <span>Timestamp</span>
+        <span>Incident Summary</span>
+        <span>AI Root Cause</span>
+        <span>Confidence</span>
+        <span class="align-right">Action</span>
+    </div>
+
+    @foreach (var i in incidents)
+    {
+        <div class="row-wrapper">
+            <div class="board-row">
+                <span class="mono muted">@i.CreatedAt.ToString("yyyy-MM-dd HH:mm:ssZ")</span>
+                <span>@i.Summary</span>
+                <span class="cause">@i.LikelyCause</span>
+                <span class="confidence-cell">
+                    <span class="bar-track">
+                        <span class="bar-fill tier-@Tier(i.ConfidenceScore)" style="width:@(i.ConfidenceScore)%"></span>
+                    </span>
+                    <span class="bar-label tier-@Tier(i.ConfidenceScore)">@i.ConfidenceScore%</span>
+                </span>
+                <span class="align-right">
+                    <button class="action-link" @onclick="() => ToggleEvidence(i.Id)">
+                        @(expandedIds.Contains(i.Id) ? "Hide Evidence" : "Review Evidence")
+                    </button>
+                </span>
+            </div>
+
+            @if (expandedIds.Contains(i.Id))
+            {
+                <div class="evidence-panel">
+                    <div class="evidence-block">
+                        <span class="evidence-label">Evidence</span>
+                        <p class="evidence-text">@i.Evidence</p>
+                    </div>
+                    <div class="evidence-meta">
+                        <span><span class="meta-label">Affected service</span> @i.AffectedService</span>
+                        <span><span class="meta-label">Related events</span> @i.RelatedEventsCount</span>
+                        <span><span class="meta-label">Alert ID</span> #@i.AlertId</span>
+                    </div>
+                    <div class="evidence-block">
+                        <span class="evidence-label">Recommended action</span>
+                        <p class="evidence-text action-text">@i.RecommendedAction</p>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!incidents.Any())
+    {
+        <div class="empty-state">
+            No incidents yet. Trigger a scenario against the demo app to see a diagnosis appear here.
+        </div>
+    }
+</div>
+
+@code {
+    private List<IncidentAgent.Models.Incident> incidents = new();
+    private HashSet<int> expandedIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        incidents = await Db.Incidents.OrderByDescending(i => i.CreatedAt).ToListAsync();
+    }
+
+    private void ToggleEvidence(int id)
+    {
+        if (!expandedIds.Add(id))
+            expandedIds.Remove(id);
+    }
+
+    private string Tier(int confidence) => confidence switch
+    {
+        >= 80 => "high",
+        >= 50 => "medium",
+        _ => "low"
+    };
+
+}
