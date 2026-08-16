@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Incident Demo — Control Panel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Incident Demo</h1>
+    <p>A deliberately breakable API — the test target for Week 3's incident agent.</p>
+  </header>
+
+  <section class="controls">
+    <div class="control-card">
+      <h2>Trigger a scenario</h2>
+      <div class="btn-row">
+        <button id="deployGood" class="btn">Normal deploy</button>
+        <button id="deployBad" class="btn btn-danger">Bad deploy (break it)</button>
+        <button id="hitEndpoint" class="btn">Call /api/orders</button>
+        <button id="reset" class="btn btn-ghost">Reset</button>
+      </div>
+      <p id="status" class="status"></p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h3>Alerts</h3>
+      <div id="alerts" class="list"></div>
+    </div>
+    <div class="panel">
+      <h3>Deployments</h3>
+      <div id="deployments" class="list"></div>
+    </div>
+    <div class="panel">
+      <h3>DB Events</h3>
+      <div id="dbEvents" class="list"></div>
+    </div>
+    <div class="panel">
+      <h3>Recent Logs</h3>
+      <div id="logs" class="list"></div>
+    </div>
+  </section>
+
+</div>
+<script>
+  async function refresh() {
+    const res = await fetch('/api/recent');
+    const data = await res.json();
+
+    document.getElementById('alerts').innerHTML = data.alerts.map(a => `
+      <div class="row alert">
+        <span class="time">${new Date(a.fired_at).toLocaleTimeString()}</span>
+        <span>${a.message}</span>
+      </div>
+    `).join('') || '<div class="empty">No alerts yet</div>';
+
+    document.getElementById('deployments').innerHTML = data.deployments.map(d => `
+      <div class="row">
+        <span class="time">${new Date(d.deployed_at).toLocaleTimeString()}</span>
+        <span class="sha">${d.commit_sha}</span>
+        <span>${d.description || ''}</span>
+      </div>
+    `).join('') || '<div class="empty">No deployments yet</div>';
+
+    document.getElementById('dbEvents').innerHTML = data.dbEvents.map(e => `
+      <div class="row">
+        <span class="time">${new Date(e.created_at).toLocaleTimeString()}</span>
+        <span class="badge">${e.event_type}</span>
+        <span>${e.detail || ''}</span>
+      </div>
+    `).join('') || '<div class="empty">No DB events yet</div>';
+
+    document.getElementById('logs').innerHTML = data.logs.map(l => `
+      <div class="row ${l.level === 'error' ? 'error' : ''}">
+        <span class="time">${new Date(l.created_at).toLocaleTimeString()}</span>
+        <span class="badge">${l.level}</span>
+        <span>${l.endpoint} — ${l.response_time_ms}ms</span>
+      </div>
+    `).join('') || '<div class="empty">No logs yet</div>';
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  document.getElementById('deployGood').addEventListener('click', async () => {
+    await fetch('/api/simulate/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ breakIt: false }) });
+    setStatus('Normal deploy simulated.');
+    refresh();
+  });
+
+  document.getElementById('deployBad').addEventListener('click', async () => {
+    await fetch('/api/simulate/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ breakIt: true }) });
+    setStatus('Bad deploy simulated — the app is now degraded.');
+    refresh();
+  });
+
+  document.getElementById('hitEndpoint').addEventListener('click', async () => {
+    const res = await fetch('/api/orders');
+    const data = await res.json();
+    setStatus(`Called /api/orders — response time ${data.responseTimeMs}ms.`);
+    refresh();
+  });
+
+  document.getElementById('reset').addEventListener('click', async () => {
+    await fetch('/api/simulate/reset', { method: 'POST' });
+    setStatus('Reset — app is healthy again.');
+    refresh();
+  });
+
+  refresh();
+  setInterval(refresh, 5000); // keep the dashboard live without manual refreshing
+</script>
+</body>
+</html>
