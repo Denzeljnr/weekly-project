@@ -1,0 +1,834 @@
+{
+  "name": "AI Incident Response & Root-Cause Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -48,
+        0
+      ],
+      "id": "d4f9f150-326b-42f7-9198-11b15592895e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT value::int AS last_id FROM n8n_state WHERE key = 'last_alert_id';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "43f5b761-8a0a-4436-a213-9f0956029185",
+      "name": "Get last seen alert",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM alerts WHERE id > {{ $json.last_id }} ORDER BY id ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        0
+      ],
+      "id": "364f8553-061f-480e-82a8-7e05e08f2476",
+      "name": "Get new alerts",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "cd9127cf-f4d4-4f3f-b25c-5c03207bd7dc",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM logs\nWHERE level = 'error'\n  AND created_at BETWEEN '{{ $json.fired_at }}'::timestamp - interval '10 minutes'\n                      AND '{{ $json.fired_at }}'::timestamp + interval '1 minute'\nORDER BY created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        16
+      ],
+      "id": "93849527-ab4e-4c3a-be4b-b671f5487dcd",
+      "name": "Get logs",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM deployments\nWHERE deployed_at BETWEEN '{{ $json.fired_at }}'::timestamp - interval '10 minutes'\n                       AND '{{ $json.fired_at }}'::timestamp + interval '1 minute'\nORDER BY deployed_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        912,
+        176
+      ],
+      "id": "d0c4ec38-c6e2-4e6d-953f-6650a6a37948",
+      "name": "Get deployments",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM db_events\nWHERE created_at BETWEEN '{{ $json.fired_at }}'::timestamp - interval '10 minutes'\n                      AND '{{ $json.fired_at }}'::timestamp + interval '1 minute'\nORDER BY created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        912,
+        336
+      ],
+      "id": "fc7d1848-499c-4a3b-99ec-86c428fa4213",
+      "name": "Get db events",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alert = $('Loop Over Items').item.json;\n\nconst logs = $('Get logs')\n  .all()\n  .map(i => i.json)\n  .filter(r => r.id !== undefined);\n\nconst deployments = $('Get deployments')\n  .all()\n  .map(i => i.json)\n  .filter(r => r.id !== undefined);\n\nconst dbEvents = $('Get db events')\n  .all()\n  .map(i => i.json)\n  .filter(r => r.id !== undefined);\n\nlet signalTypesPresent = 0;\n\nif (logs.length) signalTypesPresent++;\nif (deployments.length) signalTypesPresent++;\nif (dbEvents.length) signalTypesPresent++;\n\nconst confidence = Math.round((signalTypesPresent / 3) * 100);\n\nconst relatedEvents =\n  logs.length +\n  deployments.length +\n  dbEvents.length;\n\nconst evidenceText = `\nAlert: ${alert.message} (fired at ${alert.fired_at})\nComputed confidence: ${confidence}% (${relatedEvents} related events)\n\nRecent deployments:\n${deployments\n  .map(d => `- ${d.commit_sha} at ${d.deployed_at}: ${d.description}`)\n  .join('\\n') || 'none'}\n\nRecent error logs:\n${logs\n  .map(l => `- ${l.created_at} [${l.endpoint}] ${l.message} (${l.response_time_ms}ms)`)\n  .join('\\n') || 'none'}\n\nRecent DB events:\n${dbEvents\n  .map(e => `- ${e.created_at} ${e.event_type}: ${e.detail} (${e.duration_ms}ms)`)\n  .join('\\n') || 'none'}\n`;\n\nreturn [\n  {\n    json: {\n      alertId: alert.id,\n      confidence,\n      relatedEvents,\n      evidenceText\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        176
+      ],
+      "id": "63860ab3-8fe2-44e8-aeb8-6f834a8ac39f",
+      "name": "Merge evidence"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.evidenceText }}",
+        "options": {
+          "systemMessage": "You are an incident response assistant. You are given correlated evidence around a triggered alert: recent error logs, recent deployments, and recent database events. Your job is to produce a root-cause diagnosis.\n\nRespond ONLY in this exact JSON format, no other text:\n{\n  \"summary\": \"one line describing what happened\",\n  \"likely_cause\": \"your best hypothesis for the root cause\",\n  \"evidence\": \"a short explanation citing specific evidence (timestamps, commit shas, event types)\",\n  \"affected_service\": \"which endpoint/service this affects\",\n  \"recommended_action\": \"a specific, actionable recommendation\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1664,
+        176
+      ],
+      "id": "aec74094-4af7-4791-9004-24843adbb8a5",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1616,
+        352
+      ],
+      "id": "95d7e40e-abbd-46ce-a515-9dc363b73d41",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nlet parsed;\ntry {\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { summary: 'Parse failed', likely_cause: 'unknown', evidence: '', affected_service: '', recommended_action: 'Manual review needed' };\n}\nreturn [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        176
+      ],
+      "id": "f6caa7d8-4a82-4350-86b0-ad57b89a2d16",
+      "name": "Parse diagnosis"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "incidents",
+          "mode": "list",
+          "cachedResultName": "incidents"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "alert_id": "={{ $('Merge evidence').item.json.alertId }}",
+            "confidence_score": "={{ $('Merge evidence').item.json.confidence }}",
+            "related_events_count": "={{ $('Merge evidence').item.json.relatedEvents }}",
+            "summary": "={{ $json.summary }}",
+            "likely_cause": "={{ $json.likely_cause }}",
+            "evidence": "={{ $json.evidence }}",
+            "affected_service": "={{ $json.affected_service }}",
+            "recommended_action": "={{ $json.recommended_action }}",
+            "source": "n8n",
+            "created_at": "2026-08-13T21:33:19"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alert_id",
+              "displayName": "alert_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "likely_cause",
+              "displayName": "likely_cause",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "affected_service",
+              "displayName": "affected_service",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence_score",
+              "displayName": "confidence_score",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recommended_action",
+              "displayName": "recommended_action",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "related_events_count",
+              "displayName": "related_events_count",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2192,
+        176
+      ],
+      "id": "140c6865-ec90-4ddb-8594-e717aeb0e5de",
+      "name": "Save incident",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "email",
+        "subject": "=🚨 Incident detected — {{ $json.affected_service }}",
+        "message": "=<div style=\"font-family: sans-serif; color: #1a1a1a;\">   <h2 style=\"color: #C4573F;\">🚨 Incident Detected</h2>   <p><strong>{{ $json.summary }}</strong></p>    <table style=\"border-collapse: collapse; margin-top: 12px;\">     <tr>       <td style=\"padding: 6px 12px; color: #555;\">Likely cause</td>       <td style=\"padding: 6px 12px;\">{{ $json.likely_cause }}</td>     </tr>     <tr>       <td style=\"padding: 6px 12px; color: #555;\">Confidence</td>       <td style=\"padding: 6px 12px;\">{{ $('Merge evidence').item.json.confidence }}%</td>     </tr>     <tr>       <td style=\"padding: 6px 12px; color: #555;\">Affected service</td>       <td style=\"padding: 6px 12px;\">{{ $json.affected_service }}</td>     </tr>   </table>    <p style=\"margin-top: 16px; padding: 12px; background: #f5f5f5; border-radius: 6px;\">     <strong>Recommended action:</strong><br>     {{ $json.recommended_action }}   </p> </div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        176
+      ],
+      "id": "3b74b8ca-ac44-431d-bca0-36907721ff31",
+      "name": "Send a message",
+      "webhookId": "7e44a5bd-a343-44d9-8f44-423cf8108439",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "pwbrojGj0aRtBzLK",
+          "name": "second main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE n8n_state SET value = (SELECT MAX(id)::text FROM alerts) WHERE key = 'last_alert_id';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        816,
+        -144
+      ],
+      "id": "f3390ac6-0c25-4266-9c01-29bc68f01631",
+      "name": "Update last seen alert",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1264,
+        160
+      ],
+      "id": "6ef53e06-1e88-40dd-8b1d-8e2b2ee48fbf",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-08-13T15:56:21.653-04:00",
+          "Readable date": "August 13th 2026, 3:56:21 pm",
+          "Readable time": "3:56:21 pm",
+          "Day of week": "Thursday",
+          "Year": "2026",
+          "Month": "August",
+          "Day of month": "13",
+          "Hour": "15",
+          "Minute": "56",
+          "Second": "21",
+          "Timezone": "America/New_York (UTC-04:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Get last seen alert": [
+      {
+        "json": {
+          "last_id": 0
+        }
+      }
+    ],
+    "Get new alerts": [
+      {
+        "json": {
+          "id": 1,
+          "metric": "response_time",
+          "threshold_value": "300",
+          "actual_value": "1200",
+          "message": "precise 66% test",
+          "fired_at": "2026-08-13T12:05:00.000Z"
+        }
+      },
+      {
+        "json": {
+          "id": 2,
+          "metric": "response_time",
+          "threshold_value": "300",
+          "actual_value": "850",
+          "message": "precise 33% test",
+          "fired_at": "2026-08-13T13:05:00.000Z"
+        }
+      },
+      {
+        "json": {
+          "id": 3,
+          "metric": "response_time",
+          "threshold_value": "300",
+          "actual_value": "3000",
+          "message": "precise 100% test",
+          "fired_at": "2026-08-13T14:05:00.000Z"
+        }
+      },
+      {
+        "json": {
+          "id": 4,
+          "metric": "response_time",
+          "threshold_value": "300",
+          "actual_value": "400",
+          "message": "precise 0% test",
+          "fired_at": "2026-08-13T15:00:00.000Z"
+        }
+      }
+    ],
+    "Get logs": [
+      {
+        "json": {
+          "id": 1,
+          "level": "error",
+          "endpoint": "/api/orders",
+          "message": "test",
+          "response_time_ms": 1200,
+          "created_at": "2026-08-13T12:03:00.000Z"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Get deployments": [
+      {
+        "json": {
+          "id": 1,
+          "commit_sha": "precise66",
+          "description": "test",
+          "deployed_at": "2026-08-13T12:00:00.000Z"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Get db events": [
+      {
+        "json": {},
+        "pairedItem": [
+          {
+            "item": 0,
+            "input": 0
+          }
+        ]
+      }
+    ],
+    "Merge evidence": [
+      {
+        "json": {
+          "alertId": 1,
+          "confidence": 67,
+          "relatedEvents": 2,
+          "evidenceText": "\nAlert: precise 66% test (fired at 2026-08-13T12:05:00.000Z)\nComputed confidence: 67% (2 related events)\n\nRecent deployments:\n- precise66 at 2026-08-13T12:00:00.000Z: test\n\nRecent error logs:\n- 2026-08-13T12:03:00.000Z [/api/orders] test (1200ms)\n\nRecent DB events:\nnone\n"
+        }
+      }
+    ],
+    "AI Agent": [
+      {
+        "json": {
+          "output": "```json\n{\n  \"summary\": \"A recent deployment likely introduced an error impacting the `/api/orders` endpoint, triggering an alert.\",\n  \"likely_cause\": \"A new deployment named `precise66` at 2026-08-13T12:00:00Z caused a regression, leading to errors in the `/api/orders` service.\",\n  \"evidence\": \"A deployment `precise66` occurred at 2026-08-13T12:00:00Z. Shortly after, an error log was recorded at 2026-08-13T12:03:00Z for the `/api/orders` endpoint, which then led to the 'precise 66% test' alert firing at 2026-08-13T12:05:00Z.\",\n  \"affected_service\": \"/api/orders\",\n  \"recommended_action\": \"Rollback the `precise66` deployment and investigate the changes introduced in that version for issues impacting the `/api/orders` endpoint.\"\n}\n```"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Parse diagnosis": [
+      {
+        "json": {
+          "summary": "A recent deployment likely introduced an error impacting the `/api/orders` endpoint, triggering an alert.",
+          "likely_cause": "A new deployment named `precise66` at 2026-08-13T12:00:00Z caused a regression, leading to errors in the `/api/orders` service.",
+          "evidence": "A deployment `precise66` occurred at 2026-08-13T12:00:00Z. Shortly after, an error log was recorded at 2026-08-13T12:03:00Z for the `/api/orders` endpoint, which then led to the 'precise 66% test' alert firing at 2026-08-13T12:05:00Z.",
+          "affected_service": "/api/orders",
+          "recommended_action": "Rollback the `precise66` deployment and investigate the changes introduced in that version for issues impacting the `/api/orders` endpoint."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Save incident": [
+      {
+        "json": {
+          "id": 13,
+          "alert_id": 1,
+          "summary": "A recent deployment likely introduced an error impacting the `/api/orders` endpoint, triggering an alert.",
+          "likely_cause": "A new deployment named `precise66` at 2026-08-13T12:00:00Z caused a regression, leading to errors in the `/api/orders` service.",
+          "evidence": "A deployment `precise66` occurred at 2026-08-13T12:00:00Z. Shortly after, an error log was recorded at 2026-08-13T12:03:00Z for the `/api/orders` endpoint, which then led to the 'precise 66% test' alert firing at 2026-08-13T12:05:00Z.",
+          "affected_service": "/api/orders",
+          "confidence_score": 67,
+          "recommended_action": "Rollback the `precise66` deployment and investigate the changes introduced in that version for issues impacting the `/api/orders` endpoint.",
+          "related_events_count": 2,
+          "source": "n8n",
+          "created_at": "2026-08-14T01:33:19.000Z"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Send a message": [
+      {
+        "json": {
+          "id": "19ffcfa3c96db0ca",
+          "threadId": "19ffcfa3c96db0ca",
+          "labelIds": [
+            "UNREAD",
+            "SENT",
+            "INBOX"
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Update last seen alert": [
+      {
+        "json": {
+          "success": true
+        },
+        "pairedItem": [
+          {
+            "item": 0
+          },
+          {
+            "item": 1
+          },
+          {
+            "item": 2
+          },
+          {
+            "item": 3
+          }
+        ]
+      }
+    ],
+    "Merge": [
+      {
+        "json": {
+          "id": 1,
+          "level": "error",
+          "endpoint": "/api/orders",
+          "message": "test",
+          "response_time_ms": 1200,
+          "created_at": "2026-08-13T12:03:00.000Z"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "id": 1,
+          "commit_sha": "precise66",
+          "description": "test",
+          "deployed_at": "2026-08-13T12:00:00.000Z"
+        },
+        "pairedItem": {
+          "item": 0,
+          "input": 1
+        }
+      },
+      {
+        "json": {},
+        "pairedItem": {
+          "item": 0,
+          "input": 2
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get last seen alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last seen alert": {
+      "main": [
+        [
+          {
+            "node": "Get new alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get new alerts": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Update last seen alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get logs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get deployments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get db events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get logs": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get deployments": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get db events": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge evidence": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse diagnosis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse diagnosis": {
+      "main": [
+        [
+          {
+            "node": "Save incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save incident": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "02f160cd-573d-4154-86ce-f0c69192a02d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "64da9526fde6bb3f90690ef6b939b0ac43bb69a86da72fc052a72243617aee08"
+  },
+  "id": "cbZlXMM-H3GLoRqdeaxDM",
+  "tags": []
+}
