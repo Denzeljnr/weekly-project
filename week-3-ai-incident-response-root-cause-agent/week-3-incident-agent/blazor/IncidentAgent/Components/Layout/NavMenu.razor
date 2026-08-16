@@ -1,0 +1,58 @@
+﻿<div class="nav-brand">
+    IncidentAgent
+    <span class="nav-version">v1.0.0</span>
+</div>
+
+<nav class="nav-list">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+        <span class="nav-icon">◈</span> Incidents
+    </NavLink>
+</nav>
+
+<style>
+    .nav-brand {
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: #5B8DEF;
+        padding: 20px 20px 2px;
+    }
+
+    .nav-version {
+        display: block;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.68rem;
+        color: #75777E;
+        font-weight: 400;
+        margin-top: 2px;
+    }
+
+    .nav-list {
+        padding: 16px 12px;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 6px;
+        color: #75777E;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .nav-icon {
+        font-size: 0.85rem;
+    }
+
+    .nav-link:hover {
+        background: #12151C;
+        color: #E4E7EC;
+    }
+
+    .nav-link.active {
+        background: #16202F;
+        color: #5B8DEF;
+    }
+</style>
