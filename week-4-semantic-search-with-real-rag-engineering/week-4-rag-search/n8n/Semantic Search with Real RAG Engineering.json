@@ -1,0 +1,2915 @@
+{
+  "name": "Semantic Search with Real RAG Engineering",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e3a2bb5e-c51e-416b-97c6-90cb18ec4425",
+              "leftValue": "={{ $json.Document[0].filename.endsWith('.pdf') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        240,
+        0
+      ],
+      "id": "b09253cb-a7cc-44cd-9620-593031182a4f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Document",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "9f5a273c-b2f0-4df7-8f24-2d15615c6d5f",
+      "name": "Extract from File (PDF branch)"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "Document",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        96
+      ],
+      "id": "0be3fdef-979c-4870-8ac9-0b999cef2f44",
+      "name": "Extract from File (Text branch)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        704,
+        -16
+      ],
+      "id": "50e8df0d-f076-4e0b-aa54-8fae92765349",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7d4aeeef-ba44-4d01-a845-23fbb86a33aa",
+              "name": "sourceDocument",
+              "value": "={{ $('Form Trigger').item.json['Source Name'] || $('Form Trigger').item.json.Document[0].filename }}",
+              "type": "string"
+            },
+            {
+              "id": "3e0180dd-587f-48c4-8f5d-372153a9feab",
+              "name": "fullText",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        -16
+      ],
+      "id": "e930c16a-bbf8-487e-afae-fb259849bcf6",
+      "name": "Prepare document fields"
+    },
+    {
+      "parameters": {
+        "formTitle": "Document Insert",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "Document",
+              "fieldLabel": "Document",
+              "fieldType": "file",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Source Name",
+              "fieldLabel": "Source Name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "58f2e694-ac84-48b4-b46e-5f82f5755ac4",
+      "name": "Form Trigger",
+      "webhookId": "0661f384-9445-430d-bd26-8844c7663835"
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.fullText }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "strategy",
+                "value": "fixed"
+              },
+              {
+                "name": "sourceDocument",
+                "value": "={{ $('Prepare document fields').item.json.sourceDocument }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1296,
+        -432
+      ],
+      "id": "111c35f4-9af4-4323-8bcf-f1fe1fb54c39",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 500
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        -336
+      ],
+      "id": "b04f460b-0bb1-4324-9ac7-05a98876644c",
+      "name": "Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        -336
+      ],
+      "id": "147d4c99-637f-48e0-9761-0a2fc8a6d20f",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": "n8n_chunks",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        1152,
+        -192
+      ],
+      "id": "28aa49e0-7c85-4f07-92f8-5670bb1a7d84",
+      "name": "Insert fixed chunks",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": "n8n_chunks",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        1184,
+        96
+      ],
+      "id": "d916495c-e7d2-4f56-999e-22e7c4d1edba",
+      "name": "Insert paragraph chunks",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        256
+      ],
+      "id": "863df8a2-632e-4d30-8f80-42ccd303bf07",
+      "name": "Embeddings Google Gemini1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.fullText }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "strategy",
+                "value": "paragraph"
+              },
+              {
+                "name": "sourceDocument",
+                "value": "={{ $('Prepare document fields').item.json.sourceDocument }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        256
+      ],
+      "id": "c2dc36be-9536-47c9-a07e-6321abba2bf3",
+      "name": "Default Data Loader1"
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        400
+      ],
+      "id": "cac69a1a-b4d7-4550-b495-688d3b02f6fd",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "formTitle": "Document Retrieve ",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "Question",
+              "fieldLabel": "Question",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Strategy",
+              "fieldLabel": "Strategy",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "fixed"
+                  },
+                  {
+                    "option": "paragraph"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        -48,
+        704
+      ],
+      "id": "16ef83e7-3049-4cae-b118-1f3cfa622c23",
+      "name": "Form trigger 1",
+      "webhookId": "7dc75816-434b-4198-abb1-311bfe333f27"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        128,
+        864
+      ],
+      "id": "2f37464b-22ae-45b0-ac7c-8bc11774c2c4",
+      "name": "Embeddings Google Gemini2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "tableName": "n8n_chunks",
+        "prompt": "={{ $json.Question }}",
+        "topK": 20,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "strategy",
+                "value": "={{ $json.Strategy }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        704
+      ],
+      "id": "eb1fd5d0-be1b-48b3-a2f8-f408b405c6df",
+      "name": "Retrieve candidates",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const question = $('Form trigger 1').first().json.Question;\n\nconst candidates = $input.all().map((item, i) => ({\n  index: i,\n  text: item.json.document?.pageContent,\n  sourceDocument: item.json.document?.metadata?.sourceDocument || 'unknown'\n}));\n\nconst prompt = `Question: ${question}\n\nRate each passage's relevance to the question, 0-10. Respond ONLY with a JSON array of integers, same order as given, no other text.\n\n` + candidates.map(c => `[${c.index}] ${c.text}`).join('\\n');\n\nreturn [{ json: { prompt, candidates, question } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        704
+      ],
+      "id": "fc3e82c0-b60b-455b-9d2d-0374699165bf",
+      "name": "Format candidates for reranking"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        720,
+        896
+      ],
+      "id": "a78df6e8-9ecd-4329-a4e9-8a5ff9aa5109",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You are a relevance-scoring assistant for a document search system. You will be given a user's question and a numbered list of text passages retrieved from a vector database. Your only job is to rate how relevant each passage is to answering the question, on a scale of 0 (completely irrelevant) to 10 (directly and completely answers the question).\n\nRules:\n- Score every passage in the list, even if none of them seem relevant to the question.\n- Do not explain your reasoning or add any commentary.\n- Do not include any text other than the JSON array.\n- The array must have exactly the same number of elements, in the same order, as the passages given.\n\nRespond ONLY in this exact format, no other text:\n[7, 2, 9, 0, 5]"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        720,
+        704
+      ],
+      "id": "35fa98c5-de13-4611-9d6e-2d15311b6a0c",
+      "name": "Score relevance"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nconst cleaned = raw.replace(/```json|```/g, '').trim();\nlet scores;\ntry { scores = JSON.parse(cleaned); } catch { scores = []; }\n\nconst candidates = $('Format candidates for reranking').first().json.candidates;\nconst ranked = candidates\n  .map((c, i) => ({ ...c, relevance: scores[i] ?? 0 }))\n  .sort((a, b) => b.relevance - a.relevance)\n  .slice(0, 5);\n\nreturn [{\n  json: {\n    question: $('Format candidates for reranking').first().json.question,\n    ranked\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        704
+      ],
+      "id": "3e82eb8a-0138-4005-ae68-29e604e0fb80",
+      "name": "Rerank and keep top 5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { question, ranked } = $input.first().json;\n\nconst context = ranked\n  .map(r => `[Source: ${r.sourceDocument}] ${r.text}`)\n  .join('\\n\\n');\n\nconst prompt = `Question: ${question}\n\nPassages:\n${context}`;\n\nreturn [{ json: { question, ranked, answerPrompt: prompt } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        704
+      ],
+      "id": "fce10d57-5085-4fa7-ac15-82eeafe0a630",
+      "name": "Build answer context"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.answerPrompt }}",
+        "options": {
+          "systemMessage": "You are a research assistant answering questions using only the source passages provided to you. Follow these rules strictly:\n\n1. Only use information contained in the passages below. Do not use any outside knowledge, even if you're confident it's correct.\n2. If the passages don't contain enough information to fully answer the question, say so clearly instead of guessing or filling gaps with assumptions.\n3. After every claim or piece of information in your answer, cite which source document it came from, in square brackets, exactly like this: [Source: filename.pdf]\n4. If multiple passages support the same point, you may cite more than one source.\n5. Keep the answer focused and directly address the question asked — don't pad with unrelated detail from the passages."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1488,
+        704
+      ],
+      "id": "325e29b2-6ae5-4bf2-8883-bffb4d6bedff",
+      "name": "Generate answer"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.output }}"
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.4,
+      "position": [
+        1792,
+        704
+      ],
+      "id": "043a2fb8-7ae0-4a38-add2-5d9641ef0965",
+      "name": "Form",
+      "webhookId": "6524ee1f-8a5a-4058-966b-da1a6056dc6f"
+    }
+  ],
+  "pinData": {
+    "Extract from File (PDF branch)": [
+      {
+        "json": {
+          "numpages": 9,
+          "numrender": 9,
+          "info": {
+            "PDFFormatVersion": "1.4",
+            "Language": null,
+            "EncryptFilterName": null,
+            "IsLinearized": false,
+            "IsAcroFormPresent": false,
+            "IsXFAPresent": false,
+            "IsCollectionPresent": false,
+            "IsSignaturesPresent": false,
+            "Author": "(anonymous)",
+            "CreationDate": "D:20260820184308+00'00'",
+            "Creator": "(unspecified)",
+            "Keywords": "",
+            "ModDate": "D:20260820184308+00'00'",
+            "Producer": "ReportLab PDF Library - (opensource)",
+            "Subject": "(unspecified)",
+            "Title": "(anonymous)",
+            "Trapped": {
+              "name": "False"
+            }
+          },
+          "text": "A Reference Guide to Distributed Systems and Site\nReliability Engineering\nA working reference on failure modes, consistency models, and operational practice for production\nsystems.\n\n1. Foundations of Distributed Systems\n1.1 What Makes a System Distributed\nA distributed system is any collection of independent computers that appears to its users as a single\ncoherent system. The defining property is not the number of machines involved but the fact that\ncomponents communicate and coordinate by passing messages across a network rather than sharing\nmemory directly. This single fact introduces almost every hard problem the field deals with: messages\ncan be delayed, duplicated, reordered, or lost outright, and any two machines can disagree about\nwhat time it currently is.\nBecause failures in a distributed system are partial rather than total, a system can be simultaneously\nworking correctly for some users and failing for others. This is fundamentally different from a\nsingle-machine program, where a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming infinite bandwidth\nproduces systems that degrade badly under load. Assuming a reliable network produces retry logic\nthat either does not exist or does not handle duplicate delivery correctly.\n1.3 CAP Theorem\nThe CAP theorem states that a distributed data store can provide at most two of the following three\nguarantees simultaneously: Consistency, meaning every read receives the most recent write or an\nerror; Availability, meaning every request receives a non-error response, without the guarantee that it\ncontains the most recent write; and Partition Tolerance, meaning the system continues to operate\ndespite an arbitrary number of messages being dropped or delayed between nodes.\nIn practice, because network partitions are a physical reality that cannot be engineered away,\nPartition Tolerance is not optional for any system that spans more than one machine. The real choice\npractitioners face is therefore between Consistency and Availability during a partition event. A system\nthat chooses Consistency will refuse requests it cannot guarantee are correct, becoming unavailable\nduring a partition. A system that chooses Availability will continue answering requests, accepting that\n\nsome of those answers may be stale.\nMost production databases are not purely CP or purely AP in an absolute sense; they make this\ntrade-off differently depending on the specific operation, and many offer tunable consistency levels\nthat let an application choose per-query.\n\n2. Consensus and Coordination\n2.1 Why Consensus Is Hard\nConsensus is the problem of getting a group of distributed nodes to agree on a single value, even\nwhen some nodes may fail or messages may be delayed. The FLP impossibility result, published in\n1985 by Fischer, Lynch, and Paterson, proved that in an asynchronous network where even one\nnode might fail, no algorithm can guarantee consensus will be reached in bounded time. This does\nnot mean consensus is impossible in practice; it means any practical algorithm must make additional\nassumptions, typically about timing, in order to make progress.\n2.2 Raft and Leader Election\nRaft is a consensus algorithm designed explicitly for understandability, in contrast to the earlier Paxos\nfamily of algorithms, which are correct but notoriously difficult to reason about. Raft works by electing\na single leader among a cluster of nodes. The leader is responsible for accepting all writes and\nreplicating them to follower nodes. If the leader fails to send a heartbeat within a timeout window,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the loss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of established database connections maintained so that an application\ndoes not have to pay the cost of opening a new TCP connection and authenticating for every single\nquery. Pools have a fixed maximum size. When every connection in the pool is simultaneously in use,\nany further request must wait for one to free up. If requests are arriving faster than connections are\nbeing released, the wait queue grows without bound, and requests begin timing out.\nConnection pool exhaustion is frequently caused by a slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic graphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eventually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random delay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually reach production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understanding exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nalerts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwithin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolume of any single signal type alone.\n\n5. Data Replication and Consistency\n5.1 Synchronous vs Asynchronous Replication\nIn synchronous replication, a write is not acknowledged to the client until it has been confirmed by all\n(or a quorum of) replicas. This guarantees that an acknowledged write will survive the failure of any\nsingle replica, at the cost of higher write latency, since the client must wait for the slowest replica in\nthe quorum to respond. In asynchronous replication, a write is acknowledged as soon as the primary\nhas recorded it, and replicas catch up afterward. This is faster, but introduces a window during which\na primary failure can lose writes that were acknowledged to the client but never made it to any replica.\n5.2 Eventual Consistency\nA system is eventually consistent if, given no new writes, all replicas will eventually converge to the\nsame value, though at any given moment different replicas may temporarily disagree. This is a\ndeliberately weaker guarantee than strong consistency, chosen because it allows a system to remain\navailable and responsive even when replicas cannot immediately communicate. Many large-scale\nsystems accept eventual consistency for data where a brief staleness window is tolerable, while\nreserving strong consistency for data where it is not, such as financial balances.\n5.3 Read Repair and Anti-Entropy\nRead repair is a technique where, if a read operation detects that replicas disagree, the system\nopportunistically writes the most recent value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an incident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem is a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is realized only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood but\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one.",
+          "version": "5.3.31"
+        }
+      }
+    ],
+    "Form Trigger": [
+      {
+        "json": {
+          "Document": [
+            {
+              "filename": "distributed-systems-reference.pdf",
+              "mimetype": "application/pdf",
+              "size": 16682
+            }
+          ],
+          "Source Name": "",
+          "submittedAt": "2026-08-22T16:20:15.894-04:00",
+          "formMode": "test"
+        }
+      }
+    ],
+    "Prepare document fields": [
+      {
+        "json": {
+          "sourceDocument": "distributed-systems-reference.pdf",
+          "fullText": "A Reference Guide to Distributed Systems and Site\nReliability Engineering\nA working reference on failure modes, consistency models, and operational practice for production\nsystems.\n\n1. Foundations of Distributed Systems\n1.1 What Makes a System Distributed\nA distributed system is any collection of independent computers that appears to its users as a single\ncoherent system. The defining property is not the number of machines involved but the fact that\ncomponents communicate and coordinate by passing messages across a network rather than sharing\nmemory directly. This single fact introduces almost every hard problem the field deals with: messages\ncan be delayed, duplicated, reordered, or lost outright, and any two machines can disagree about\nwhat time it currently is.\nBecause failures in a distributed system are partial rather than total, a system can be simultaneously\nworking correctly for some users and failing for others. This is fundamentally different from a\nsingle-machine program, where a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming infinite bandwidth\nproduces systems that degrade badly under load. Assuming a reliable network produces retry logic\nthat either does not exist or does not handle duplicate delivery correctly.\n1.3 CAP Theorem\nThe CAP theorem states that a distributed data store can provide at most two of the following three\nguarantees simultaneously: Consistency, meaning every read receives the most recent write or an\nerror; Availability, meaning every request receives a non-error response, without the guarantee that it\ncontains the most recent write; and Partition Tolerance, meaning the system continues to operate\ndespite an arbitrary number of messages being dropped or delayed between nodes.\nIn practice, because network partitions are a physical reality that cannot be engineered away,\nPartition Tolerance is not optional for any system that spans more than one machine. The real choice\npractitioners face is therefore between Consistency and Availability during a partition event. A system\nthat chooses Consistency will refuse requests it cannot guarantee are correct, becoming unavailable\nduring a partition. A system that chooses Availability will continue answering requests, accepting that\n\nsome of those answers may be stale.\nMost production databases are not purely CP or purely AP in an absolute sense; they make this\ntrade-off differently depending on the specific operation, and many offer tunable consistency levels\nthat let an application choose per-query.\n\n2. Consensus and Coordination\n2.1 Why Consensus Is Hard\nConsensus is the problem of getting a group of distributed nodes to agree on a single value, even\nwhen some nodes may fail or messages may be delayed. The FLP impossibility result, published in\n1985 by Fischer, Lynch, and Paterson, proved that in an asynchronous network where even one\nnode might fail, no algorithm can guarantee consensus will be reached in bounded time. This does\nnot mean consensus is impossible in practice; it means any practical algorithm must make additional\nassumptions, typically about timing, in order to make progress.\n2.2 Raft and Leader Election\nRaft is a consensus algorithm designed explicitly for understandability, in contrast to the earlier Paxos\nfamily of algorithms, which are correct but notoriously difficult to reason about. Raft works by electing\na single leader among a cluster of nodes. The leader is responsible for accepting all writes and\nreplicating them to follower nodes. If the leader fails to send a heartbeat within a timeout window,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the loss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of established database connections maintained so that an application\ndoes not have to pay the cost of opening a new TCP connection and authenticating for every single\nquery. Pools have a fixed maximum size. When every connection in the pool is simultaneously in use,\nany further request must wait for one to free up. If requests are arriving faster than connections are\nbeing released, the wait queue grows without bound, and requests begin timing out.\nConnection pool exhaustion is frequently caused by a slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic graphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eventually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random delay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually reach production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understanding exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nalerts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwithin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolume of any single signal type alone.\n\n5. Data Replication and Consistency\n5.1 Synchronous vs Asynchronous Replication\nIn synchronous replication, a write is not acknowledged to the client until it has been confirmed by all\n(or a quorum of) replicas. This guarantees that an acknowledged write will survive the failure of any\nsingle replica, at the cost of higher write latency, since the client must wait for the slowest replica in\nthe quorum to respond. In asynchronous replication, a write is acknowledged as soon as the primary\nhas recorded it, and replicas catch up afterward. This is faster, but introduces a window during which\na primary failure can lose writes that were acknowledged to the client but never made it to any replica.\n5.2 Eventual Consistency\nA system is eventually consistent if, given no new writes, all replicas will eventually converge to the\nsame value, though at any given moment different replicas may temporarily disagree. This is a\ndeliberately weaker guarantee than strong consistency, chosen because it allows a system to remain\navailable and responsive even when replicas cannot immediately communicate. Many large-scale\nsystems accept eventual consistency for data where a brief staleness window is tolerable, while\nreserving strong consistency for data where it is not, such as financial balances.\n5.3 Read Repair and Anti-Entropy\nRead repair is a technique where, if a read operation detects that replicas disagree, the system\nopportunistically writes the most recent value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an incident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem is a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is realized only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood but\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one."
+        }
+      }
+    ],
+    "Merge": [
+      {
+        "json": {
+          "numpages": 9,
+          "numrender": 9,
+          "info": {
+            "PDFFormatVersion": "1.4",
+            "Language": null,
+            "EncryptFilterName": null,
+            "IsLinearized": false,
+            "IsAcroFormPresent": false,
+            "IsXFAPresent": false,
+            "IsCollectionPresent": false,
+            "IsSignaturesPresent": false,
+            "Author": "(anonymous)",
+            "CreationDate": "D:20260820184308+00'00'",
+            "Creator": "(unspecified)",
+            "Keywords": "",
+            "ModDate": "D:20260820184308+00'00'",
+            "Producer": "ReportLab PDF Library - (opensource)",
+            "Subject": "(unspecified)",
+            "Title": "(anonymous)",
+            "Trapped": {
+              "name": "False"
+            }
+          },
+          "text": "A Reference Guide to Distributed Systems and Site\nReliability Engineering\nA working reference on failure modes, consistency models, and operational practice for production\nsystems.\n\n1. Foundations of Distributed Systems\n1.1 What Makes a System Distributed\nA distributed system is any collection of independent computers that appears to its users as a single\ncoherent system. The defining property is not the number of machines involved but the fact that\ncomponents communicate and coordinate by passing messages across a network rather than sharing\nmemory directly. This single fact introduces almost every hard problem the field deals with: messages\ncan be delayed, duplicated, reordered, or lost outright, and any two machines can disagree about\nwhat time it currently is.\nBecause failures in a distributed system are partial rather than total, a system can be simultaneously\nworking correctly for some users and failing for others. This is fundamentally different from a\nsingle-machine program, where a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming infinite bandwidth\nproduces systems that degrade badly under load. Assuming a reliable network produces retry logic\nthat either does not exist or does not handle duplicate delivery correctly.\n1.3 CAP Theorem\nThe CAP theorem states that a distributed data store can provide at most two of the following three\nguarantees simultaneously: Consistency, meaning every read receives the most recent write or an\nerror; Availability, meaning every request receives a non-error response, without the guarantee that it\ncontains the most recent write; and Partition Tolerance, meaning the system continues to operate\ndespite an arbitrary number of messages being dropped or delayed between nodes.\nIn practice, because network partitions are a physical reality that cannot be engineered away,\nPartition Tolerance is not optional for any system that spans more than one machine. The real choice\npractitioners face is therefore between Consistency and Availability during a partition event. A system\nthat chooses Consistency will refuse requests it cannot guarantee are correct, becoming unavailable\nduring a partition. A system that chooses Availability will continue answering requests, accepting that\n\nsome of those answers may be stale.\nMost production databases are not purely CP or purely AP in an absolute sense; they make this\ntrade-off differently depending on the specific operation, and many offer tunable consistency levels\nthat let an application choose per-query.\n\n2. Consensus and Coordination\n2.1 Why Consensus Is Hard\nConsensus is the problem of getting a group of distributed nodes to agree on a single value, even\nwhen some nodes may fail or messages may be delayed. The FLP impossibility result, published in\n1985 by Fischer, Lynch, and Paterson, proved that in an asynchronous network where even one\nnode might fail, no algorithm can guarantee consensus will be reached in bounded time. This does\nnot mean consensus is impossible in practice; it means any practical algorithm must make additional\nassumptions, typically about timing, in order to make progress.\n2.2 Raft and Leader Election\nRaft is a consensus algorithm designed explicitly for understandability, in contrast to the earlier Paxos\nfamily of algorithms, which are correct but notoriously difficult to reason about. Raft works by electing\na single leader among a cluster of nodes. The leader is responsible for accepting all writes and\nreplicating them to follower nodes. If the leader fails to send a heartbeat within a timeout window,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the loss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of established database connections maintained so that an application\ndoes not have to pay the cost of opening a new TCP connection and authenticating for every single\nquery. Pools have a fixed maximum size. When every connection in the pool is simultaneously in use,\nany further request must wait for one to free up. If requests are arriving faster than connections are\nbeing released, the wait queue grows without bound, and requests begin timing out.\nConnection pool exhaustion is frequently caused by a slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic graphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eventually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random delay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually reach production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understanding exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nalerts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwithin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolume of any single signal type alone.\n\n5. Data Replication and Consistency\n5.1 Synchronous vs Asynchronous Replication\nIn synchronous replication, a write is not acknowledged to the client until it has been confirmed by all\n(or a quorum of) replicas. This guarantees that an acknowledged write will survive the failure of any\nsingle replica, at the cost of higher write latency, since the client must wait for the slowest replica in\nthe quorum to respond. In asynchronous replication, a write is acknowledged as soon as the primary\nhas recorded it, and replicas catch up afterward. This is faster, but introduces a window during which\na primary failure can lose writes that were acknowledged to the client but never made it to any replica.\n5.2 Eventual Consistency\nA system is eventually consistent if, given no new writes, all replicas will eventually converge to the\nsame value, though at any given moment different replicas may temporarily disagree. This is a\ndeliberately weaker guarantee than strong consistency, chosen because it allows a system to remain\navailable and responsive even when replicas cannot immediately communicate. Many large-scale\nsystems accept eventual consistency for data where a brief staleness window is tolerable, while\nreserving strong consistency for data where it is not, such as financial balances.\n5.3 Read Repair and Anti-Entropy\nRead repair is a technique where, if a read operation detects that replicas disagree, the system\nopportunistically writes the most recent value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an incident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem is a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is realized only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood but\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one.",
+          "version": "5.3.31"
+        }
+      }
+    ],
+    "Insert fixed chunks": [
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 1,
+                "to": 10
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "A Reference Guide to Distributed Systems and Site\nReliability Engineering\nA working reference on failure modes, consistency models, and operational practice for production\nsystems.\n\n1. Foundations of Distributed Systems\n1.1 What Makes a System Distributed\nA distributed system is any collection of independent computers that appears to its users as a single\ncoherent system. The defining property is not the number of machines involved but the fact that\ncomponents communicate and coordinate by passi"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 10,
+                "to": 16
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ng messages across a network rather than sharing\nmemory directly. This single fact introduces almost every hard problem the field deals with: messages\ncan be delayed, duplicated, reordered, or lost outright, and any two machines can disagree about\nwhat time it currently is.\nBecause failures in a distributed system are partial rather than total, a system can be simultaneously\nworking correctly for some users and failing for others. This is fundamentally different from a\nsingle-machine program, wh"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 16,
+                "to": 22
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ere a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 22,
+                "to": 27
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 27,
+                "to": 33
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "infinite bandwidth\nproduces systems that degrade badly under load. Assuming a reliable network produces retry logic\nthat either does not exist or does not handle duplicate delivery correctly.\n1.3 CAP Theorem\nThe CAP theorem states that a distributed data store can provide at most two of the following three\nguarantees simultaneously: Consistency, meaning every read receives the most recent write or an\nerror; Availability, meaning every request receives a non-error response, without the guarantee"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 33,
+                "to": 39
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "that it\ncontains the most recent write; and Partition Tolerance, meaning the system continues to operate\ndespite an arbitrary number of messages being dropped or delayed between nodes.\nIn practice, because network partitions are a physical reality that cannot be engineered away,\nPartition Tolerance is not optional for any system that spans more than one machine. The real choice\npractitioners face is therefore between Consistency and Availability during a partition event. A system\nthat chooses Co"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 39,
+                "to": 48
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "nsistency will refuse requests it cannot guarantee are correct, becoming unavailable\nduring a partition. A system that chooses Availability will continue answering requests, accepting that\n\nsome of those answers may be stale.\nMost production databases are not purely CP or purely AP in an absolute sense; they make this\ntrade-off differently depending on the specific operation, and many offer tunable consistency levels\nthat let an application choose per-query.\n\n2. Consensus and Coordination\n2.1 Wh"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 48,
+                "to": 53
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "y Consensus Is Hard\nConsensus is the problem of getting a group of distributed nodes to agree on a single value, even\nwhen some nodes may fail or messages may be delayed. The FLP impossibility result, published in\n1985 by Fischer, Lynch, and Paterson, proved that in an asynchronous network where even one\nnode might fail, no algorithm can guarantee consensus will be reached in bounded time. This does\nnot mean consensus is impossible in practice; it means any practical algorithm must make addition"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 53,
+                "to": 59
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "al\nassumptions, typically about timing, in order to make progress.\n2.2 Raft and Leader Election\nRaft is a consensus algorithm designed explicitly for understandability, in contrast to the earlier Paxos\nfamily of algorithms, which are correct but notoriously difficult to reason about. Raft works by electing\na single leader among a cluster of nodes. The leader is responsible for accepting all writes and\nreplicating them to follower nodes. If the leader fails to send a heartbeat within a timeout wi"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 59,
+                "to": 65
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ndow,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the lo"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 65,
+                "to": 71
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 71,
+                "to": 79
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of esta"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 79,
+                "to": 84
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "blished database connections maintained so that an application\ndoes not have to pay the cost of opening a new TCP connection and authenticating for every single\nquery. Pools have a fixed maximum size. When every connection in the pool is simultaneously in use,\nany further request must wait for one to free up. If requests are arriving faster than connections are\nbeing released, the wait queue grows without bound, and requests begin timing out.\nConnection pool exhaustion is frequently caused by a"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 84,
+                "to": 89
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 89,
+                "to": 96
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "raphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eve"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 96,
+                "to": 101
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ntually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 101,
+                "to": 108
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random del"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 108,
+                "to": 115
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually rea"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 115,
+                "to": 123
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 123,
+                "to": 129
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "g exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 129,
+                "to": 135
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nal"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 135,
+                "to": 141
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "erts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwit"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 141,
+                "to": 146
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 146,
+                "to": 153
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "me of any single signal type alone.\n\n5. Data Replication and Consistency\n5.1 Synchronous vs Asynchronous Replication\nIn synchronous replication, a write is not acknowledged to the client until it has been confirmed by all\n(or a quorum of) replicas. This guarantees that an acknowledged write will survive the failure of any\nsingle replica, at the cost of higher write latency, since the client must wait for the slowest replica in\nthe quorum to respond. In asynchronous replication, a write is acknow"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 153,
+                "to": 159
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ledged as soon as the primary\nhas recorded it, and replicas catch up afterward. This is faster, but introduces a window during which\na primary failure can lose writes that were acknowledged to the client but never made it to any replica.\n5.2 Eventual Consistency\nA system is eventually consistent if, given no new writes, all replicas will eventually converge to the\nsame value, though at any given moment different replicas may temporarily disagree. This is a\ndeliberately weaker guarantee than stro"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 159,
+                "to": 165
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ng consistency, chosen because it allows a system to remain\navailable and responsive even when replicas cannot immediately communicate. Many large-scale\nsystems accept eventual consistency for data where a brief staleness window is tolerable, while\nreserving strong consistency for data where it is not, such as financial balances.\n5.3 Read Repair and Anti-Entropy\nRead repair is a technique where, if a read operation detects that replicas disagree, the system\nopportunistically writes the most rece"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 165,
+                "to": 173
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 173,
+                "to": 179
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 179,
+                "to": 184
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "s a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is reali"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 184,
+                "to": 190
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "zed only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood b"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 190,
+                "to": 194
+              }
+            },
+            "strategy": "fixed",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "ut\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Insert paragraph chunks": [
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 1,
+                "to": 4
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "A Reference Guide to Distributed Systems and Site\nReliability Engineering\nA working reference on failure modes, consistency models, and operational practice for production\nsystems."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 6,
+                "to": 11
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "1. Foundations of Distributed Systems\n1.1 What Makes a System Distributed\nA distributed system is any collection of independent computers that appears to its users as a single\ncoherent system. The defining property is not the number of machines involved but the fact that\ncomponents communicate and coordinate by passing messages across a network rather than sharing\nmemory directly. This single fact introduces almost every hard problem the field deals with: messages"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 12,
+                "to": 16
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "can be delayed, duplicated, reordered, or lost outright, and any two machines can disagree about\nwhat time it currently is.\nBecause failures in a distributed system are partial rather than total, a system can be simultaneously\nworking correctly for some users and failing for others. This is fundamentally different from a\nsingle-machine program, where a crash typically halts everything at once. Distributed systems"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 17,
+                "to": 22
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "engineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is not reliable. Latency is not zero. Bandwidth is not infinite. The"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 23,
+                "to": 27
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "network is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming infinite bandwidth"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 28,
+                "to": 33
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "produces systems that degrade badly under load. Assuming a reliable network produces retry logic\nthat either does not exist or does not handle duplicate delivery correctly.\n1.3 CAP Theorem\nThe CAP theorem states that a distributed data store can provide at most two of the following three\nguarantees simultaneously: Consistency, meaning every read receives the most recent write or an\nerror; Availability, meaning every request receives a non-error response, without the guarantee that it"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 34,
+                "to": 38
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "contains the most recent write; and Partition Tolerance, meaning the system continues to operate\ndespite an arbitrary number of messages being dropped or delayed between nodes.\nIn practice, because network partitions are a physical reality that cannot be engineered away,\nPartition Tolerance is not optional for any system that spans more than one machine. The real choice\npractitioners face is therefore between Consistency and Availability during a partition event. A system"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 39,
+                "to": 40
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "that chooses Consistency will refuse requests it cannot guarantee are correct, becoming unavailable\nduring a partition. A system that chooses Availability will continue answering requests, accepting that"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 42,
+                "to": 45
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "some of those answers may be stale.\nMost production databases are not purely CP or purely AP in an absolute sense; they make this\ntrade-off differently depending on the specific operation, and many offer tunable consistency levels\nthat let an application choose per-query."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 47,
+                "to": 52
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "2. Consensus and Coordination\n2.1 Why Consensus Is Hard\nConsensus is the problem of getting a group of distributed nodes to agree on a single value, even\nwhen some nodes may fail or messages may be delayed. The FLP impossibility result, published in\n1985 by Fischer, Lynch, and Paterson, proved that in an asynchronous network where even one\nnode might fail, no algorithm can guarantee consensus will be reached in bounded time. This does"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 53,
+                "to": 57
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "not mean consensus is impossible in practice; it means any practical algorithm must make additional\nassumptions, typically about timing, in order to make progress.\n2.2 Raft and Leader Election\nRaft is a consensus algorithm designed explicitly for understandability, in contrast to the earlier Paxos\nfamily of algorithms, which are correct but notoriously difficult to reason about. Raft works by electing"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 58,
+                "to": 62
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "a single leader among a cluster of nodes. The leader is responsible for accepting all writes and\nreplicating them to follower nodes. If the leader fails to send a heartbeat within a timeout window,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 63,
+                "to": 68
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "number of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the loss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 69,
+                "to": 73
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "This is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 74,
+                "to": 75
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "definition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 77,
+                "to": 82
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of established database connections maintained so that an application\ndoes not have to pay the cost of opening a new TCP connection and authenticating for every single\nquery. Pools have a fixed maximum size. When every connection in the pool is simultaneously in use,\nany further request must wait for one to free up. If requests are arriving faster than connections are"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 83,
+                "to": 87
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "being released, the wait queue grows without bound, and requests begin timing out.\nConnection pool exhaustion is frequently caused by a slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 88,
+                "to": 93
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "outright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic graphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 94,
+                "to": 98
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "propagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eventually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 99,
+                "to": 104
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "dependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 105,
+                "to": 110
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "same moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random delay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 112,
+                "to": 116
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "A disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually reach production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 117,
+                "to": 118
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "incident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 120,
+                "to": 125
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understanding exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 126,
+                "to": 130
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "request as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 131,
+                "to": 135
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "or an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nalerts, including genuinely critical ones. This is widely considered one of the most dangerous states"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 136,
+                "to": 141
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "an operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwithin a time window around a triggered alert, on the theory that a genuine incident will produce"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 142,
+                "to": 146
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "several related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolume of any single signal type alone."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 148,
+                "to": 153
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "5. Data Replication and Consistency\n5.1 Synchronous vs Asynchronous Replication\nIn synchronous replication, a write is not acknowledged to the client until it has been confirmed by all\n(or a quorum of) replicas. This guarantees that an acknowledged write will survive the failure of any\nsingle replica, at the cost of higher write latency, since the client must wait for the slowest replica in\nthe quorum to respond. In asynchronous replication, a write is acknowledged as soon as the primary"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 154,
+                "to": 158
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "has recorded it, and replicas catch up afterward. This is faster, but introduces a window during which\na primary failure can lose writes that were acknowledged to the client but never made it to any replica.\n5.2 Eventual Consistency\nA system is eventually consistent if, given no new writes, all replicas will eventually converge to the\nsame value, though at any given moment different replicas may temporarily disagree. This is a"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 159,
+                "to": 164
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "deliberately weaker guarantee than strong consistency, chosen because it allows a system to remain\navailable and responsive even when replicas cannot immediately communicate. Many large-scale\nsystems accept eventual consistency for data where a brief staleness window is tolerable, while\nreserving strong consistency for data where it is not, such as financial balances.\n5.3 Read Repair and Anti-Entropy\nRead repair is a technique where, if a read operation detects that replicas disagree, the system"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 165,
+                "to": 169
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "opportunistically writes the most recent value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 171,
+                "to": 176
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an incident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 177,
+                "to": 181
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "tends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem is a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 182,
+                "to": 186
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "system allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is realized only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 187,
+                "to": 192
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "but never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood but\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "metadata": {
+            "source": "blob",
+            "blobType": "text/plain",
+            "loc": {
+              "lines": {
+                "from": 193,
+                "to": 194
+              }
+            },
+            "strategy": "paragraph",
+            "sourceDocument": "distributed-systems-reference.pdf"
+          },
+          "pageContent": "changes become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Form trigger 1": [
+      {
+        "json": {
+          "Question": "What should happen in the first ten minutes of an incident?",
+          "Strategy": "fixed",
+          "submittedAt": "2026-08-23T05:42:54.493-04:00",
+          "formMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Retrieve candidates": [
+      {
+        "json": {
+          "document": {
+            "pageContent": "ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 179,
+                  "from": 173
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.3182303309440613
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 173,
+                  "from": 165
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.34330594539642334
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ut\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one.",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 194,
+                  "from": 190
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.35976370569522054
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "zed only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood b",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 190,
+                  "from": 184
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.3605225086212158
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 146,
+                  "from": 141
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.38811168741514057
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 123,
+                  "from": 115
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.38899608784890594
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "s a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is reali",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 184,
+                  "from": 179
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.3934907551700316
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually rea",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 115,
+                  "from": 108
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.3976640162763586
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nal",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 135,
+                  "from": 129
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.3981224119103671
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "g exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 129,
+                  "from": 123
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4115094542503357
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 27,
+                  "from": 22
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.42285953232227336
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "erts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwit",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 141,
+                  "from": 135
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4303680997867515
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "raphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eve",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 96,
+                  "from": 89
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.43052119844898795
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ntually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 101,
+                  "from": 96
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4349462053147667
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 89,
+                  "from": 84
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.43662711600226756
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of esta",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 79,
+                  "from": 71
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4596148455372535
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random del",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 108,
+                  "from": 101
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.46551534327956
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 71,
+                  "from": 65
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.46981388330459595
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ndow,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the lo",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 65,
+                  "from": 59
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4710831169262314
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "document": {
+            "pageContent": "ere a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is",
+            "metadata": {
+              "loc": {
+                "lines": {
+                  "to": 22,
+                  "from": 16
+                }
+              },
+              "source": "blob",
+              "blobType": "text/plain",
+              "strategy": "fixed",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          },
+          "score": 0.4744710326194763
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Format candidates for reranking": [
+      {
+        "json": {
+          "prompt": "Question: What should happen in the first ten minutes of an incident?\n\nRate each passage's relevance to the question, 0-10. Respond ONLY with a JSON array of integers, same order as given, no other text.\n\n[0] ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i\n[1] nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc\n[2] ut\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one.\n[3] zed only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood b\n[4] hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu\n[5] ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin\n[6] s a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is reali\n[7] ay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually rea\n[8] you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nal\n[9] g exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell\n[10] not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming\n[11] erts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwit\n[12] raphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eve\n[13] ntually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load\n[14] slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g\n[15] worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of esta\n[16] on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random del\n[17] ss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the\n[18] ndow,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the lo\n[19] ere a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is",
+          "candidates": [
+            {
+              "index": 0,
+              "text": "ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 1,
+              "text": "nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 2,
+              "text": "ut\ntime-pressured, where looking up the correct response from memory under stress is more error-prone\nthan following a written checklist. Runbooks that are not kept up to date as the underlying system\nchanges become actively dangerous, since a responder following a stale runbook may take an action\nthat was correct for an older version of the system but harmful for the current one.",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 3,
+              "text": "zed only if the follow-up actions it identifies are actually completed.\nTeams that consistently write thorough postmortems but do not track follow-up items to completion\ntend to see the same categories of incident recur, since the underlying conditions were documented\nbut never actually addressed.\n6.3 Runbooks\nA runbook is a documented, step-by-step procedure for responding to a specific, previously\nencountered type of incident. Runbooks are most valuable for incidents that are well understood b",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 4,
+              "text": "hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 5,
+              "text": "ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 6,
+              "text": "s a structured written account of an incident, produced after resolution, covering the\ntimeline of events, the root cause, the impact, and the concrete follow-up actions intended to prevent\nrecurrence. The most effective postmortems are blameless: they focus on what conditions in the\nsystem allowed the incident to occur, rather than which individual made a mistake, on the grounds\nthat a system which depends on no human ever making an error is not a resilient system.\nA postmortem's value is reali",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 7,
+              "text": "ay to its retry interval, is the standard fix, since it spreads retries out over time\ninstead of concentrating them at a single instant.\n3.4 Deployment-Related Incidents\n\nA disproportionate share of production incidents correlate closely in time with a recent deployment.\nThis is not because deployments are inherently risky in some abstract sense, but because a\ndeployment is the single most common way that new, untested code paths, configuration changes, or\ndependency version changes actually rea",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 8,
+              "text": "you that a specific error occurred, but not how common it was relative to normal traffic.\nTraces can show you which specific service call was slow, but not whether that slowness was typical\nor an anomaly. Effective incident diagnosis generally requires moving between all three.\n4.2 Alert Fatigue\nAlert fatigue occurs when a team receives so many alerts, including a high proportion of false\npositives or low-severity notifications, that they begin to habitually ignore or delay responding to all\nal",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 9,
+              "text": "g exactly what happened\nat a specific point in time. Metrics are numeric measurements aggregated over time, such as request\nrate or error count, useful for spotting trends and setting alerting thresholds. Traces follow a single\nrequest as it moves through multiple services, useful for understanding where time is actually being\nspent in a system composed of many small services.\nNo single pillar is sufficient on its own. Metrics can tell you that response time increased, but not why.\nLogs can tell",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 10,
+              "text": "not reliable. Latency is not zero. Bandwidth is not infinite. The\nnetwork is not secure. Topology does not stay constant. There is not a single administrator. Transport\ncost is not zero. The network is not homogeneous.\nThese are widely referred to as the eight fallacies of distributed computing. Each one, when assumed\nrather than verified, tends to produce a specific class of production incident. Assuming zero latency\nproduces systems that time out under real-world network conditions. Assuming",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 11,
+              "text": "erts, including genuinely critical ones. This is widely considered one of the most dangerous states\nan operations team can be in, since it defeats the entire purpose of having automated monitoring.\nThe standard mitigation is to alert only on symptoms that are directly user-facing and actionable,\nrather than on every internal metric that deviates from its usual range.\n4.3 Root Cause Correlation\nAutomated root-cause analysis tools generally work by correlating multiple independent signal types\nwit",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 12,
+              "text": "raphs together, since no single signal\nreliably distinguishes between them on its own.\n3.2 Cascading Failures\nA cascading failure begins when one component becomes slow or unavailable, and the resulting\nbackpressure causes the components that depend on it to also become slow or unavailable,\npropagating outward through the system. A common trigger is a downstream service beginning to\nrespond slowly rather than failing fast; callers hold open connections and threads waiting for a\nresponse that eve",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 13,
+              "text": "ntually arrives too late to be useful, exhausting their own resource limits in the\nprocess and becoming slow themselves.\nCircuit breakers are the standard mitigation. A circuit breaker tracks the failure rate of calls to a\ndependency and, once that rate crosses a threshold, stops sending new requests to it entirely for a\ncooldown period, failing fast instead of waiting on a request that is likely to time out anyway. This\nprotects the caller's own resources and, just as importantly, reduces load",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 14,
+              "text": "slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 15,
+              "text": "worst case, data loss.\nQuorum-based systems are designed specifically to prevent split-brain by requiring a strict majority\nbefore any group of nodes is permitted to act as the authoritative primary. A minority partition, by\ndefinition, cannot reach a majority of the total cluster and is therefore forced to become read-only or\nunavailable rather than risk diverging from the majority side.\n\n3. Failure Modes in Production Systems\n3.1 Connection Pool Exhaustion\nA connection pool is a cache of esta",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 16,
+              "text": "on the already-struggling\ndownstream service, giving it room to recover.\n3.3 Thundering Herd\nA thundering herd occurs when a large number of clients simultaneously retry a failed request at the\nsame moment, often because they all share the same retry interval or were all waiting on the same\nexpired cache entry. The resulting spike can overwhelm a service that had otherwise nearly\nrecovered, effectively re-triggering the original outage. Jittered backoff, where each client adds a\nsmall random del",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 17,
+              "text": "ss of one node before losing majority.\n2.3 Split-Brain Scenarios\nA split-brain scenario occurs when a network partition causes two disjoint groups of nodes to each\nbelieve they are the legitimate leader or primary, and both continue accepting writes independently.\nThis is one of the most dangerous failure modes in distributed systems because it can silently\nproduce two divergent, conflicting versions of the same data, and reconciling them after the fact may\nrequire manual intervention or, in the",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 18,
+              "text": "ndow,\nfollowers assume it has crashed and hold a new election.\nA critical detail is that a Raft cluster requires a majority of nodes, not merely a plurality, to agree\nbefore a write is considered committed. This is why Raft clusters are typically deployed with an odd\nnumber of nodes: a five-node cluster can tolerate the loss of two nodes and still form a majority of\nthree, while a four-node cluster provides no additional fault tolerance over a three-node one, since it\nstill only tolerates the lo",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            },
+            {
+              "index": 19,
+              "text": "ere a crash typically halts everything at once. Distributed systems\nengineering is therefore less about preventing failure entirely and more about designing systems that\ncontinue operating usefully in the presence of failure.\n1.2 The Eight Fallacies of Distributed Computing\nEarly in the history of networked computing, engineers at Sun Microsystems identified a set of\nassumptions that programmers habitually make when writing distributed software, all of which are\nfalse in practice. The network is",
+              "sourceDocument": "distributed-systems-reference.pdf"
+            }
+          ],
+          "question": "What should happen in the first ten minutes of an incident?"
+        }
+      }
+    ],
+    "Score relevance": [
+      {
+        "json": {
+          "output": "[9, 7, 3, 2, 4, 8, 0, 2, 1, 1, 0, 1, 1, 1, 5, 0, 0, 0, 0, 0]"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Rerank and keep top 5": [
+      {
+        "json": {
+          "question": "What should happen in the first ten minutes of an incident?",
+          "ranked": [
+            {
+              "index": 0,
+              "text": "ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 9
+            },
+            {
+              "index": 5,
+              "text": "ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 8
+            },
+            {
+              "index": 1,
+              "text": "nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 7
+            },
+            {
+              "index": 14,
+              "text": "slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 5
+            },
+            {
+              "index": 4,
+              "text": "hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 4
+            }
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Build answer context": [
+      {
+        "json": {
+          "question": "What should happen in the first ten minutes of an incident?",
+          "ranked": [
+            {
+              "index": 0,
+              "text": "ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 9
+            },
+            {
+              "index": 5,
+              "text": "ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 8
+            },
+            {
+              "index": 1,
+              "text": "nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 7
+            },
+            {
+              "index": 14,
+              "text": "slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 5
+            },
+            {
+              "index": 4,
+              "text": "hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu",
+              "sourceDocument": "distributed-systems-reference.pdf",
+              "relevance": 4
+            }
+          ],
+          "answerPrompt": "Question: What should happen in the first ten minutes of an incident?\n\nPassages:\n[Source: distributed-systems-reference.pdf] ident response are disproportionately valuable, and disproportionately\nprone to wasted effort. A common failure pattern is for the first responder to begin deep-diving into a\nsingle hypothesis before establishing basic situational awareness: what changed recently, which\nservice is affected, and how many users are impacted. Establishing this context first, even briefly,\ntends to shorten total resolution time more than immediately pursuing the first plausible theory.\n6.2 Postmortems\nA postmortem i\n\n[Source: distributed-systems-reference.pdf] ch production traffic. For this reason, checking deployment\nhistory is almost always among the first steps in diagnosing an unexplained incident, and many\nincident response processes explicitly ask whether anything was deployed in the window immediately\npreceding the first symptom.\n\n4. Observability\n4.1 The Three Pillars\nObservability is commonly described in terms of three data types: logs, metrics, and traces. Logs are\ndiscrete, timestamped records of individual events, useful for understandin\n\n[Source: distributed-systems-reference.pdf] nt value back to the stale replicas as a side effect of serving the\nread. Anti-entropy processes run independently and periodically, comparing replicas against each\nother in the background and reconciling differences even for data that has not been recently read.\nTogether these mechanisms bound how long a replica can remain stale, without requiring every\nsingle write to pay the cost of synchronous replication.\n\n6. Incident Response Practice\n6.1 The First Ten Minutes\nThe initial minutes of an inc\n\n[Source: distributed-systems-reference.pdf] slow query holding a connection open far\nlonger than expected, a connection leak where code fails to release a connection back to the pool\nafter use, or a genuine traffic spike that exceeds the pool's configured capacity. From the outside, all\nthree causes look identical: response times climb sharply, and eventually requests start failing\noutright. Diagnosing which of the three actually occurred requires correlating the timing of the\nslowdown against recent deployments, query logs, and traffic g\n\n[Source: distributed-systems-reference.pdf] hin a time window around a triggered alert, on the theory that a genuine incident will produce\nseveral related signals close together in time, while noise tends to be isolated. A single error log entry\nwith no corresponding deployment, alert, or metric anomaly nearby is far more likely to be routine\nbackground noise than the signature of a real incident. Confidence in an automated diagnosis should\nscale with how many independent signal types actually corroborate each other, not with the raw\nvolu"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Form": [
+      {
+        "json": {
+          "output": "The initial minutes of an incident are disproportionately valuable but also prone to wasted effort [Source: distributed-systems-reference.pdf]. During this time, the first responder should prioritize establishing basic situational awareness rather than immediately deep-diving into a single hypothesis [Source: distributed-systems-reference.pdf].\n\nEstablishing this context first, even briefly, tends to shorten total resolution time [Source: distributed-systems-reference.pdf]. This involves determining:\n*   What changed recently [Source: distributed-systems-reference.pdf]\n*   Which service is affected [Source: distributed-systems-reference.pdf]\n*   How many users are impacted [Source: distributed-systems-reference.pdf]\n\nAdditionally, checking deployment history is almost always among the first steps in diagnosing an unexplained incident [Source: distributed-systems-reference.pdf]. Many incident response processes specifically ask if anything was deployed in the time window immediately preceding the first symptom [Source: distributed-systems-reference.pdf]."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Generate answer": [
+      {
+        "json": {
+          "output": "The initial minutes of an incident are disproportionately valuable but also prone to wasted effort [Source: distributed-systems-reference.pdf]. During this time, the first responder should prioritize establishing basic situational awareness rather than immediately deep-diving into a single hypothesis [Source: distributed-systems-reference.pdf].\n\nEstablishing this context first, even briefly, tends to shorten total resolution time [Source: distributed-systems-reference.pdf]. This involves determining:\n*   What changed recently [Source: distributed-systems-reference.pdf]\n*   Which service is affected [Source: distributed-systems-reference.pdf]\n*   How many users are impacted [Source: distributed-systems-reference.pdf]\n\nAdditionally, checking deployment history is almost always among the first steps in diagnosing an unexplained incident [Source: distributed-systems-reference.pdf]. Many incident response processes specifically ask if anything was deployed in the time window immediately preceding the first symptom [Source: distributed-systems-reference.pdf]."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Extract from File (PDF branch)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from File (Text branch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File (Text branch)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract from File (PDF branch)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare document fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare document fields": {
+      "main": [
+        [
+          {
+            "node": "Insert fixed chunks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert paragraph chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert fixed chunks",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert fixed chunks",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert paragraph chunks",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert paragraph chunks",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form trigger 1": {
+      "main": [
+        [
+          {
+            "node": "Retrieve candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Retrieve candidates",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve candidates": {
+      "main": [
+        [
+          {
+            "node": "Format candidates for reranking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format candidates for reranking": {
+      "main": [
+        [
+          {
+            "node": "Score relevance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Score relevance",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Generate answer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score relevance": {
+      "main": [
+        [
+          {
+            "node": "Rerank and keep top 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rerank and keep top 5": {
+      "main": [
+        [
+          {
+            "node": "Build answer context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build answer context": {
+      "main": [
+        [
+          {
+            "node": "Generate answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate answer": {
+      "main": [
+        [
+          {
+            "node": "Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "a6f3da76-efe8-4634-b4a5-66dc0c1d0df5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "64da9526fde6bb3f90690ef6b939b0ac43bb69a86da72fc052a72243617aee08"
+  },
+  "id": "TdN9CTWkdrR-Kle8HnkW-",
+  "tags": []
+}
