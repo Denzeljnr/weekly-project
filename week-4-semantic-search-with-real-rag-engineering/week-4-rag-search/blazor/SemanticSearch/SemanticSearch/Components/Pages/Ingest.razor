@@ -1,0 +1,219 @@
+﻿@page "/ingest"
+@using Microsoft.AspNetCore.Components.Forms
+@using SemanticSearch.Interfaces
+@using SemanticSearch.Models
+@inject IIngestionService Ingestion
+@inject IPdfTextExtractor PdfExtractor
+@inject IDocumentService DocumentService
+@inject IEnumerable<IChunker> Chunkers
+
+<link rel="stylesheet" href="app.css">
+
+<h1 style="font-family:'Source Serif 4',serif;">Ingest a Document</h1>
+<p style="color:var(--ink-dim);">Upload a .txt or .pdf file to add it to the corpus, chunked by both strategies at once.</p>
+
+<div class="catalog-card" style="max-width:520px;">
+    <InputFile OnChange="OnFileSelected" accept=".txt,.pdf" disabled="@isProcessingFile" />
+
+    @if (!string.IsNullOrWhiteSpace(fileName))
+    {
+        <p class="mono" style="margin-top:10px;">Selected: @fileName</p>
+    }
+
+    @if (isProcessingFile)
+    {
+        <p class="mono" style="margin-top:6px; color:var(--ink-dim);">
+            @if (extractionProgress != null)
+            {
+                <text>Extracting: @extractionProgress.PagesProcessed / @extractionProgress.TotalPages pages</text>
+            }
+            else
+            {
+                <text>Processing file...</text>
+            }
+        </p>
+    }
+
+    @if (estimatedChunks != null)
+    {
+        <p class="mono" style="margin-top:6px; color:var(--ink-dim);">
+            Estimated ~@estimatedChunks chunks (@estimatedBatches API batches)
+        </p>
+    }
+
+    <button class="btn btn-primary" @onclick="IngestSelectedFile" disabled="@(selectedStream == null || isBusy || isProcessingFile)" style="margin-top:12px;">
+        @(isBusy ? "Ingesting..." : "Ingest")
+    </button>
+
+    @if (isBusy && currentProgress != null)
+    {
+        <p class="mono" style="margin-top:10px; color:var(--ink-dim);">
+            @currentProgress.Phase: @currentProgress.Completed / @currentProgress.Total chunks
+        </p>
+    }
+
+    @if (statusMessage != null)
+    {
+        <p class="mono" style="margin-top:10px;">@statusMessage</p>
+    }
+</div>
+
+<h2 style="font-family:'Source Serif 4',serif; margin-top:36px;">Ingested Documents</h2>
+
+@if (documents.Items.Count == 0)
+{
+    <p class="mono" style="color:var(--ink-dim);">No documents ingested yet.</p>
+}
+
+@foreach (var doc in documents.Items)
+{
+    <div class="doc-row">
+        <div>
+            <div class="doc-row-name">@doc.SourceDocument</div>
+            <p class="doc-row-meta">@doc.ChunkCount chunks</p>
+        </div>
+        <button class="btn btn-danger" @onclick="() => DeleteDocument(doc.SourceDocument)">Delete</button>
+    </div>
+}
+
+@if (documents.TotalPages > 1)
+{
+    <div style="display:flex; gap:6px; margin-top:12px;">
+        @for (int i = 1; i <= documents.TotalPages; i++)
+        {
+            var pageNum = i;
+            <button class="btn-page @(pageNum == currentPage ? "active" : "")" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+        }
+    </div>
+}
+
+@code {
+    private Stream? selectedStream;
+    private string? fileName;
+    private string? extension;
+    private string? extractedText;
+    private bool isBusy;
+    private bool isProcessingFile;
+    private string? statusMessage;
+    private PagedDocuments documents = new(new(), 0, 1, 5);
+    private int currentPage = 1;
+    private IngestionProgress? currentProgress;
+    private PdfExtractionProgress? extractionProgress;
+    private int? estimatedChunks;
+    private int? estimatedBatches;
+
+    private const long MaxFileSize = 20 * 1024 * 1024; // 20 MB cap
+    private const int BatchSize = 50; // must match IngestionService.BatchSize
+
+    protected override async Task OnInitializedAsync()
+    {
+        documents = await DocumentService.ListDocumentsAsync(currentPage);
+    }
+
+    private async Task GoToPage(int page)
+    {
+        currentPage = page;
+        documents = await DocumentService.ListDocumentsAsync(currentPage);
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        fileName = file.Name;
+        extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        statusMessage = null;
+        estimatedChunks = null;
+        estimatedBatches = null;
+        extractionProgress = null;
+
+        if (extension != ".txt" && extension != ".pdf")
+        {
+            statusMessage = "Only .txt and .pdf files are supported.";
+            selectedStream = null;
+            return;
+        }
+
+        isProcessingFile = true;
+
+        try
+        {
+            var memoryStream = new MemoryStream();
+            await file.OpenReadStream(MaxFileSize).CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+            selectedStream = memoryStream;
+
+            if (extension == ".pdf")
+            {
+                // Created on the UI thread, so its callback auto-marshals back
+                // to this circuit's synchronization context — no InvokeAsync needed.
+                var pdfProgress = new Progress<PdfExtractionProgress>(p =>
+                {
+                    extractionProgress = p;
+                    StateHasChanged();
+                });
+
+                selectedStream.Position = 0;
+                // Task.Run moves the CPU-bound parse off this circuit's sync context,
+                // so the UI stays responsive (progress updates, other clicks) instead
+                // of freezing for the whole extraction on a large PDF.
+                extractedText = await Task.Run(() => PdfExtractor.ExtractText(selectedStream, pdfProgress));
+            }
+            else
+            {
+                selectedStream.Position = 0;
+                using var reader = new StreamReader(selectedStream, leaveOpen: true);
+                extractedText = await reader.ReadToEndAsync();
+            }
+
+            var textForChunking = extractedText;
+            var totalChunks = await Task.Run(() => Chunkers.Sum(c => c.Chunk(textForChunking!).Count));
+            estimatedChunks = totalChunks;
+            estimatedBatches = (int)Math.Ceiling(totalChunks / (double)BatchSize);
+        }
+        finally
+        {
+            isProcessingFile = false;
+            extractionProgress = null;
+        }
+    }
+
+    private async Task IngestSelectedFile()
+    {
+        if (selectedStream == null || fileName == null || extractedText == null) return;
+
+        isBusy = true;
+        statusMessage = null;
+        currentProgress = null;
+
+        var progress = new Progress<IngestionProgress>(p =>
+        {
+            currentProgress = p;
+            StateHasChanged();
+        });
+
+        try
+        {
+            await Ingestion.IngestAsync(fileName, extractedText, progress);
+            statusMessage = $"Ingested '{fileName}' successfully — both chunking strategies applied.";
+            documents = await DocumentService.ListDocumentsAsync(currentPage);
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Ingestion failed: {ex.Message}. Chunks embedded before the failure were saved.";
+        }
+        finally
+        {
+            isBusy = false;
+            currentProgress = null;
+            selectedStream = null;
+            estimatedChunks = null;
+            estimatedBatches = null;
+        }
+    }
+
+    private async Task DeleteDocument(string sourceDocument)
+    {
+        await DocumentService.DeleteDocumentAsync(sourceDocument);
+        documents = await DocumentService.ListDocumentsAsync(currentPage);
+    }
+}
