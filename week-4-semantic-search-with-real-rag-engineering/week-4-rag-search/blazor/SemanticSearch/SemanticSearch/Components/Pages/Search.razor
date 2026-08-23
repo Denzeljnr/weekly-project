@@ -1,0 +1,68 @@
+﻿@page "/"
+@using SemanticSearch.Interfaces
+@using SemanticSearch.Models
+@inject IRetrievalService Retrieval
+@inject IRerankingService Reranker
+@inject IAnswerService Answerer
+
+<link rel="stylesheet" href="app.css">
+
+<h1 style="font-family:'Source Serif 4',serif;">Catalog Search</h1>
+
+<input class="search-bar" @bind="question" @bind:event="oninput" placeholder="Ask a question about the corpus..." />
+
+<div class="strategy-toggle">
+    <button class="@(strategy == "fixed" ? "active" : "")" @onclick='() => strategy = "fixed"'>Fixed-size chunks</button>
+    <button class="@(strategy == "paragraph" ? "active" : "")" @onclick='() => strategy = "paragraph"'>Paragraph-aware chunks</button>
+</div>
+
+<button class="btn btn-primary" @onclick="RunSearch" disabled="@isSearching">
+    @(isSearching ? "Searching..." : "Search")
+</button>
+
+@if (isSearching)
+{
+    <p class="mono" style="color:var(--ink-dim); margin-top:8px;">
+        Retrieving candidates, reranking, and generating an answer...
+    </p>
+}
+
+@if (answer != null)
+{
+    <div class="answer-panel">@answer</div>
+}
+
+@foreach (var r in results)
+{
+    <div class="catalog-card">
+        <div class="card-source">@r.Chunk.SourceDocument</div>
+        <p class="card-content">@r.Chunk.Content</p>
+        <span class="relevance-stamp">relevance @r.Relevance/10</span>
+    </div>
+}
+
+@code {
+    private string question = "";
+    private string strategy = "paragraph";
+    private string? answer;
+    private List<RankedChunk> results = new();
+    private bool isSearching;
+
+    private async Task RunSearch()
+    {
+        isSearching = true;
+        answer = null;
+        results = new();
+
+        try
+        {
+            var candidates = await Retrieval.RetrieveCandidatesAsync(question, strategy);
+            results = await Reranker.RerankAsync(question, candidates);
+            answer = await Answerer.AnswerAsync(question, results);
+        }
+        finally
+        {
+            isSearching = false;
+        }
+    }
+}
