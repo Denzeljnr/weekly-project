@@ -1,0 +1,52 @@
+﻿@page "/"
+@using WriteAngle.Interfaces
+@inject IReportOrchestrator Orchestrator
+@inject IPdfExportService PdfExporter
+
+<link rel="stylesheet" href="app.css">
+
+<h1 style="font-family:'Newsreader',serif;">WriteAngle</h1>
+<p class="mono" style="color:var(--ink-dim);font-size:12px;">Grounded, critiqued, revised.</p>
+
+<input class="topic-input" @bind="topic" placeholder="Enter a research topic..." />
+<button class="btn" @onclick="GenerateReport" disabled="@isGenerating">
+    @(isGenerating ? "Researching…" : "Generate Report")
+</button>
+@if (errorMessage != null)
+{
+    <p class="mono" style="color:var(--pen);margin-top:12px;">@errorMessage</p>
+}
+
+@if (report != null)
+{
+    <div class="report-card">
+        <span class="revision-badge">@report.RevisionCount revision(s)</span>
+        <p style="white-space:pre-wrap;">@report.FinalText</p>
+        <a href="@($"/export/{report.Id}")" class="btn" style="text-decoration:none;display:inline-block;">Export PDF</a>
+    </div>
+}
+
+@code {
+    private string topic = "";
+    private bool isGenerating;
+    private string? errorMessage;
+    private WriteAngle.Models.Report? report;
+
+    private async Task GenerateReport()
+    {
+        isGenerating = true;
+        errorMessage = null;
+        try
+        {
+            report = await Orchestrator.GenerateReportAsync(topic);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+}
