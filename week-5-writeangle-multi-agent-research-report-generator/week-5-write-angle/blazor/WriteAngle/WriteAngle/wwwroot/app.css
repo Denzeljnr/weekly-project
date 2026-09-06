@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Fira+Code:wght@400;500&display=swap');
+
+:root {
+    --paper: #F4F4F1;
+    --card: #FFFFFF;
+    --rule: #DCDCD6;
+    --ink: #1A1A18;
+    --ink-dim: #6E6E68;
+    --pen: #C0392B;
+    --pen-soft: rgba(192,57,43,0.08);
+    --approved: #2F6F4E;
+}
+
+body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Newsreader', serif;
+    padding: 32px;
+}
+
+.mono {
+    font-family: 'Fira Code', monospace;
+}
+
+.topic-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-family: 'Newsreader', serif;
+    font-size: 16px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--card);
+}
+
+.btn {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    padding: 9px 16px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.revision-badge {
+    display: inline-block;
+    font-family: 'Fira Code', monospace;
+    font-size: 10.5px;
+    color: var(--pen);
+    border: 1px solid var(--pen);
+    border-radius: 3px;
+    padding: 2px 8px;
+}
+
+.report-card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 24px 28px;
+    margin-top: 20px;
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.source-list {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-top: 16px;
+}
