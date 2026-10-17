@@ -1,0 +1,542 @@
+{
+  "name": "Research (grounded)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Topic",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "Topic",
+              "fieldLabel": "Topic"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "a56335b3-c1bd-410d-91f9-e3cf4791f1e1",
+      "name": "Form Trigger",
+      "webhookId": "a5386893-eb64-400d-963b-7244456de1dd"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5981f331-5859-44ac-a5c4-0ba4fc93341b",
+              "name": "Topic",
+              "value": "={{ $json.Topic }}",
+              "type": "string"
+            },
+            {
+              "id": "09f96727-64e0-4755-9968-9218b1509ab2",
+              "name": "revisionCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "7b62f3b4-3fa3-4da9-b2d0-2c3f4662299b",
+              "name": "feedbackText",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "de428420-2392-4aa7-99bd-429347bee31d",
+      "name": "Initialize state"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"text\": \"You are a research assistant. Use web search to find real, current information on the given topic. Respond ONLY in this exact JSON format, no other text: { \\\"claims\\\": [ { \\\"claim\\\": \\\"string\\\", \\\"sourceUrl\\\": \\\"string\\\", \\\"sourceTitle\\\": \\\"string\\\" } ] }\\n\\nTopic: {{ $json.Topic }}\\n\\n{{ $json.feedbackText ? 'Address these specific issues from the previous draft: ' + $json.feedbackText : '' }}\"\n        }\n      ]\n    }\n  ],\n  \"tools\": [\n    { \"google_search\": {} }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        112,
+        0
+      ],
+      "id": "174d389b-4e8b-46da-8360-c3ea9e71a0f2",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "OlwVxnKRxoMdkuNV",
+          "name": "Gemini Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.candidates[0].content.parts[0].text;\nconst cleaned = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry { parsed = JSON.parse(cleaned); } catch { parsed = { claims: [] }; }\n\nreturn [{\n  json: {\n    topic: $('Initialize state').first().json.Topic,\n    revisionCount: $('Initialize state').first().json.revisionCount,\n    claims: parsed.claims || []\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "13017c14-1236-4ef5-bbbc-2f95f208c9ba",
+      "name": "Parse research draft"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        512,
+        176
+      ],
+      "id": "8cd11e55-6136-412b-9528-ccbb8b7d6944",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.claims.map(c => `Claim: ${c.claim}\\nSource: ${c.sourceTitle} (${c.sourceUrl})`).join('\\n\\n') }}",
+        "options": {
+          "systemMessage": "=You are a skeptical fact-checking editor. For each claim, judge whether it is genuinely well-supported by its cited source, based on the source's title and URL alone. Flag anything vague, unsupported, or where the source doesn't obviously match the claim.\n\nRespond ONLY in this exact JSON format, no other text:\n{ \"approved\": true or false, \"issues\": [ { \"description\": \"string\", \"relatedClaim\": \"string\" } ] }\nSet approved to true only if there are no issues."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        512,
+        0
+      ],
+      "id": "d5b5d0a3-2d9c-48a9-aab1-c6380ade16b7",
+      "name": "Critic review"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nconst cleaned = raw.replace(/```json|```/g, '').trim();\nlet critique;\ntry { critique = JSON.parse(cleaned); } catch { critique = { approved: true, issues: [] }; }\n\nreturn [{\n  json: {\n    topic: $('Parse research draft').first().json.topic,\n    revisionCount: $('Parse research draft').first().json.revisionCount,\n    claims: $('Parse research draft').first().json.claims,\n    approved: critique.approved,\n    issues: critique.issues || []\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "ff8d02f2-4515-4f84-b2a5-55ece64fb5c8",
+      "name": "Parse critique"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "feffd754-f04e-4730-9710-2d9e4b57ce0d",
+              "leftValue": "={{ $json.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "046bb8c4-425d-4abd-846a-a0ec7d68f89b",
+              "leftValue": "={{ $json.revisionCount }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "f021bf11-6a58-4a93-9b6f-8f0cf292fee5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "acda033f-6efd-47ab-b6a7-44114632880f",
+              "name": "topic",
+              "value": "={{ $('Initialize state').item.json.Topic }}",
+              "type": "string"
+            },
+            {
+              "id": "0126fb68-2c29-42a0-bc82-9154e9b53e1b",
+              "name": "revisionCount",
+              "value": "={{ $json.revisionCount + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "b8f0c58b-7313-410f-aeeb-c88894b59790",
+              "name": "feedbackText",
+              "value": "={{ $json.issues.map(i => i.description + ' (related to: ' + i.relatedClaim + ')').join('; ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        96
+      ],
+      "id": "b21f793c-fc6d-4dc0-ad29-3410dee4e3c6",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Topic: {{ $('Initialize state').item.json.Topic }}\n\nApproved claims:\n{{ $json.claims.map(c => `- ${c.claim} [Source: ${c.sourceTitle}]`).join('\\n') }}",
+        "options": {
+          "systemMessage": "You are a professional research writer. Produce a clean, well-organized report using only the claims and sources provided. Cite the source title after each claim you use."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1392,
+        -80
+      ],
+      "id": "6dca5989-c7e1-4e21-a57a-52ec817ec320",
+      "name": "Writer"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        -208
+      ],
+      "id": "b59602a1-2569-4974-87a8-fe50cfa88308",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "i2YJ0xjCu8FLh6F6",
+          "name": "website"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "reports",
+          "mode": "list",
+          "cachedResultName": "reports"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "revision_count": "={{ $('Parse critique').first().json.revisionCount }}",
+            "topic": "={{ $('Parse critique').first().json.topic }}",
+            "final_text": "={{ $json.output }}",
+            "sources_json": "={{ JSON.stringify($('Parse critique').first().json.claims) }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "final_text",
+              "displayName": "final_text",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "revision_count",
+              "displayName": "revision_count",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sources_json",
+              "displayName": "sources_json",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        -96
+      ],
+      "id": "3c4b1efc-b85a-49c2-ab65-7777859d4f1b",
+      "name": "Save report",
+      "credentials": {
+        "postgres": {
+          "id": "sTxJvjSXwo3iecZA",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Your report is ready",
+        "completionMessage": "={{ $json.final_text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.4,
+      "position": [
+        1936,
+        -96
+      ],
+      "id": "f0ace08f-4e46-41ba-9a59-034946416d25",
+      "name": "Form completion message",
+      "webhookId": "55318de5-fe5f-437f-a373-86b6e1d4d334"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Initialize state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize state": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parse research draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse research draft": {
+      "main": [
+        [
+          {
+            "node": "Critic review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Critic review",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critic review": {
+      "main": [
+        [
+          {
+            "node": "Parse critique",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse critique": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Writer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Writer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Writer": {
+      "main": [
+        [
+          {
+            "node": "Save report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save report": {
+      "main": [
+        [
+          {
+            "node": "Form completion message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "fdfa7aa7-bfb6-436a-85af-bb6f5d8ffb8b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "64da9526fde6bb3f90690ef6b939b0ac43bb69a86da72fc052a72243617aee08"
+  },
+  "id": "EqG345g1fcWhMCqEfZWbU",
+  "tags": []
+}
